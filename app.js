@@ -1622,6 +1622,19 @@ function updateHeaderProfile() {
   }
 }
 
+el('help-btn').addEventListener('click', () => {
+  show('help-modal');
+  document.body.style.overflow = 'hidden';
+});
+el('close-help').addEventListener('click', () => {
+  hide('help-modal');
+  document.body.style.overflow = '';
+});
+el('help-backdrop').addEventListener('click', () => {
+  hide('help-modal');
+  document.body.style.overflow = '';
+});
+
 el('profile-btn').addEventListener('click', openProfileModal);
 el('joukkue-open-profile-btn').addEventListener('click', openProfileModal);
 el('close-profile').addEventListener('click', closeProfileModal);
