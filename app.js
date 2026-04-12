@@ -2014,7 +2014,9 @@ async function adminExportTeamCsv(team) {
     return ta - tb;
   });
 
-  const filename = `${team.replace(/\s+/g, '_')}_harjoitukset.csv`;
+  const filename = team === '__ALL__'
+    ? `kaikki_pelaajat_harjoitukset.csv`
+    : `${team.replace(/\s+/g, '_')}_harjoitukset.csv`;
   downloadCsv(rows, filename);
 }
 
