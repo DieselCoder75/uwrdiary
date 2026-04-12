@@ -262,8 +262,10 @@ el('auth-form').addEventListener('submit', async (e) => {
 
   try {
     if (isLoginMode) {
+      isNewRegistration = false;
       await auth.signInWithEmailAndPassword(email, password);
     } else {
+      isNewRegistration = true;
       await auth.createUserWithEmailAndPassword(email, password);
     }
   } catch (err) {
