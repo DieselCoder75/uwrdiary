@@ -357,7 +357,7 @@ el('onboarding-form').addEventListener('submit', async (e) => {
   } catch (err) {
     console.error('Onboarding save failed:', err);
     btn.disabled = false;
-    btn.textContent = 'Aloita treenikirja →';
+    btn.textContent = 'Aloita käyttö →';
     alert('Tallennus epäonnistui, yritä uudelleen.');
   }
 });

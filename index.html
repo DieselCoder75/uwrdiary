@@ -8,14 +8,14 @@
   <meta name="theme-color" content="#4f46e5">
   <link rel="manifest" href="manifest.json">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=157">
+  <link rel="stylesheet" href="styles.css?v=158">
 </head>
 <body>
 
   <!-- Auth View -->
   <div id="auth-view" class="view">
     <div class="auth-container">
-      <h1>UWR Diary</h1>
+      <div class="auth-logo">🤿</div><h1>UWR Diary</h1>
       <div class="auth-tabs">
         <button class="tab-btn active" id="login-tab">Kirjaudu</button>
         <button class="tab-btn" id="register-tab">Rekisteröidy</button>
@@ -39,7 +39,7 @@
     <!-- Sticky top bar: header + nav tabs -->
     <div class="app-top-bar">
       <header>
-        <h1>UWR Diary</h1>
+        <div class="auth-logo">🤿</div><h1>UWR Diary</h1>
         <div class="header-actions">
           <span id="header-firstname"></span>
           <button id="profile-btn" class="avatar-btn" aria-label="Profiili">
@@ -108,14 +108,6 @@
         <div class="chart-section">
           <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
           <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
-        </div>
-        <div class="chart-section">
-          <p class="chart-title">Matka (km) – Viikko – Viimeiset 12 viikkoa</p>
-          <div class="chart-wrap"><canvas id="chart-weekly-distance"></canvas></div>
-        </div>
-        <div class="chart-section">
-          <p class="chart-title">Keskisyke (bpm) – Viikko – Viimeiset 12 viikkoa</p>
-          <div class="chart-wrap"><canvas id="chart-weekly-hr"></canvas></div>
         </div>
       </div>
 
@@ -369,7 +361,7 @@
           </label>
         </div>
 
-        <button type="submit" class="btn-primary onboarding-submit">Aloita treenikirja →</button>
+        <button type="submit" class="btn-primary onboarding-submit">Aloita käyttö →</button>
       </form>
     </div>
   </div>
@@ -556,6 +548,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=157"></script>
+  <script src="app.js?v=158"></script>
 </body>
 </html>

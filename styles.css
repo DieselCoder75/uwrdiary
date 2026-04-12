@@ -66,6 +66,12 @@ body {
   justify-content: center;
 }
 
+.auth-logo {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: -0.5rem;
+}
+
 .auth-container h1 {
   font-size: 1.65rem;
   font-weight: 900;
@@ -1873,4 +1879,54 @@ details[open] .form-extra-toggle::after {
   font-size: 0.82rem;
   color: var(--text-muted);
   line-height: 1.45;
+}
+
+/* ── Onboarding modal ───────────────────────────────────────── */
+.onboarding-content {
+  max-height: 92vh;
+  overflow-y: auto;
+  border-radius: var(--radius-lg, 16px);
+}
+
+.onboarding-hero {
+  text-align: center;
+  padding: 1.75rem 1.25rem 1rem;
+}
+
+.onboarding-logo {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 0.6rem;
+}
+
+.onboarding-hero h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--blue-deep);
+  margin-bottom: 0.4rem;
+}
+
+.onboarding-hero p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+#onboarding-form {
+  padding: 0.5rem 1.25rem 1.5rem;
+}
+
+.onboarding-submit {
+  width: 100%;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+}
+
+.label-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: normal;
+  margin-left: 0.25rem;
 }
