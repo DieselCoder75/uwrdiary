@@ -586,7 +586,7 @@ function entryCardHtml(doc) {
           <span class="stats-center">${d.performance ? `<span class="entry-perf-badge" style="background:${PERF_COLORS[d.performance-1]}22;color:${PERF_COLORS_DARK[d.performance-1]};border:1px solid ${PERF_COLORS[d.performance-1]}55">${PERF_ROMAN[d.performance - 1]} – ${PERF_LABELS[d.performance].split(' – ')[1]}</span>` : ''}</span>
           <span class="stats-right">${d.feeling ? `<span class="entry-feel-badge" style="background:${FEEL_COLORS[d.feeling].bg};color:${FEEL_COLORS[d.feeling].color}">${FEEL_EMOJIS[d.feeling]} ${FEEL_LABELS[d.feeling]}</span>` : ''}</span>
           ${(d.distance != null || d.avgHr != null || d.maxHr != null) ? `
-          <span class="extra-col1">${d.distance != null ? `📍 ${d.distance} km` : ''}</span>
+          <span class="extra-col1">${d.distance != null ? `📍 ${String(d.distance).replace('.', ',')} km` : ''}</span>
           <span class="extra-col2">${d.avgHr != null ? `❤️ ${d.avgHr} bpm` : ''}</span>
           <span class="extra-col3">${d.maxHr != null ? `🔺 ${d.maxHr} bpm` : ''}</span>` : ''}
         </div>
