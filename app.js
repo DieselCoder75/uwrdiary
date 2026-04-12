@@ -297,7 +297,6 @@ auth.onAuthStateChanged(async (user) => {
   currentUser = user;
   if (user) {
     hide('auth-view');
-    show('app-view');
     el('auth-submit').disabled = false;
 
     // 1. Serve profile from cache instantly (zero reads)
@@ -307,16 +306,59 @@ auth.onAuthStateChanged(async (user) => {
       updateHeaderProfile();
     }
 
-    // 2. Load from Firestore — combine email write + profile read into one operation
+    // 2. Load from Firestore
     await loadProfile();
 
-    // 3. Start entries (also cache-aware)
+    // 3. New user → show onboarding instead of app
+    if (!userProfile.onboardingDone) {
+      show('onboarding-modal');
+      return;
+    }
+
+    show('app-view');
+    // 4. Start entries (also cache-aware)
     loadEntries();
   } else {
     if (unsubEntries) unsubEntries();
     userProfile = {};
-    show('auth-view');
     hide('app-view');
+    hide('onboarding-modal');
+    show('auth-view');
+  }
+});
+
+// ── Onboarding form ────────────────────────────────────────────
+el('onboarding-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'Tallennetaan…';
+
+  const firstName = el('ob-firstname').value.trim();
+  const teams = [...document.querySelectorAll('input[name="ob-team"]:checked')].map(c => c.value);
+  const shareActivities = el('ob-share-activities').checked;
+  const shareComments   = el('ob-share-comments').checked;
+
+  try {
+    const profile = {
+      firstName,
+      teams,
+      shareActivities,
+      shareComments,
+      onboardingDone: true,
+    };
+    await getUserDoc().set({ profile }, { merge: true });
+    userProfile = { ...userProfile, ...profile };
+    Cache.set(currentUser.uid, 'profile', userProfile);
+    updateHeaderProfile();
+    hide('onboarding-modal');
+    show('app-view');
+    loadEntries();
+  } catch (err) {
+    console.error('Onboarding save failed:', err);
+    btn.disabled = false;
+    btn.textContent = 'Aloita treenikirja →';
+    alert('Tallennus epäonnistui, yritä uudelleen.');
   }
 });
 
