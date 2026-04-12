@@ -204,6 +204,30 @@ header h1 {
   letter-spacing: 0.01em;
 }
 
+/* Help button in header */
+.help-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+
+.help-btn:active {
+  background: rgba(255,255,255,0.25);
+  border-color: white;
+}
+
 /* Avatar button in header */
 .avatar-btn {
   width: 34px;
