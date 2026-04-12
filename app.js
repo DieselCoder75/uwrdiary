@@ -2130,10 +2130,14 @@ function joukkueFeedItemHtml(item, myReaction, avatarCache) {
       </div>
       <div class="joukkue-entry-body">
         <div class="joukkue-entry-type">${escapeHtml(entry.type || '—')}</div>
-        <div class="joukkue-entry-meta">
+        <div class="entry-stats-grid">
           <span class="entry-duration">⏱ ${entry.duration || '?'} min</span>
-          ${perfBadge}
-          ${feelBadge}
+          <span class="stats-center">${perfBadge !== '<span></span>' ? perfBadge : ''}</span>
+          <span class="stats-right">${feelBadge}</span>
+          ${(entry.distance != null || entry.avgHr != null || entry.maxHr != null) ? `
+          <span class="extra-col1">${entry.distance != null ? `📍 ${String(entry.distance).replace('.', ',')} km` : ''}</span>
+          <span class="extra-col2">${entry.avgHr != null ? `❤️ ${entry.avgHr} bpm` : ''}</span>
+          <span class="extra-col3">${entry.maxHr != null ? `🔺 ${entry.maxHr} bpm` : ''}</span>` : ''}
         </div>
         ${entry.comment && profile.shareComments ? `<div class="entry-comment">${escapeHtml(entry.comment)}</div>` : ''}
       </div>
