@@ -1985,17 +1985,18 @@ el('admin-csv-team-btn').addEventListener('click', async () => {
 });
 
 async function adminExportTeamCsv(team) {
-  // Fetch all users that belong to the team
   const snap = await db.collection('users').get();
-  const members = snap.docs
-    .map(d => ({ uid: d.id, profile: d.data().profile || {}, email: d.data().email || '' }))
-    .filter(u => {
-      const teams = u.profile.teams || (u.profile.team ? [u.profile.team] : []);
-      return teams.includes(team);
-    });
+  const allUsers = snap.docs.map(d => ({ uid: d.id, profile: d.data().profile || {}, email: d.data().email || '' }));
+
+  const members = team === '__ALL__'
+    ? allUsers
+    : allUsers.filter(u => {
+        const teams = u.profile.teams || (u.profile.team ? [u.profile.team] : []);
+        return teams.includes(team);
+      });
 
   if (members.length === 0) {
-    alert('Ei jäseniä joukkueessa: ' + team);
+    alert(team === '__ALL__' ? 'Ei käyttäjiä.' : 'Ei jäseniä joukkueessa: ' + team);
     return;
   }
 
