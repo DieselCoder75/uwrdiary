@@ -324,6 +324,56 @@
     </div>
   </div>
 
+  <!-- Onboarding Modal (new users) -->
+  <div id="onboarding-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content onboarding-content">
+      <div class="onboarding-hero">
+        <div class="onboarding-logo">🤿</div>
+        <h2>Tervetuloa UWR Diaryyn!</h2>
+        <p>Täytetään nopeasti muutama tieto, niin pääset heti kirjaamaan treenejä.</p>
+      </div>
+      <form id="onboarding-form">
+
+        <div class="form-group">
+          <label for="ob-firstname">Etunimi</label>
+          <input type="text" id="ob-firstname" placeholder="Kirjoita etunimesi" autocomplete="given-name">
+        </div>
+
+        <div class="form-group">
+          <label>Joukkue <span class="label-hint">(valinnainen, monivalinta)</span></label>
+          <div class="team-checkbox-group">
+            <label class="team-checkbox-item">
+              <input type="checkbox" name="ob-team" value="Naisten Maajoukkue">
+              <span>Naisten Maajoukkue</span>
+            </label>
+            <label class="team-checkbox-item">
+              <input type="checkbox" name="ob-team" value="Urheilusukeltajat">
+              <span>Urheilusukeltajat</span>
+            </label>
+            <label class="team-checkbox-item">
+              <input type="checkbox" name="ob-team" value="PSK-Kupla">
+              <span>PSK-Kupla</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Joukkue-näkyvyys <span class="label-hint">(voit muuttaa myöhemmin profiilista)</span></label>
+          <label class="team-checkbox-item">
+            <input type="checkbox" id="ob-share-activities" checked>
+            <span>Näytä omat aktiviteetit joukkueen syötteessä</span>
+          </label>
+          <label class="team-checkbox-item">
+            <input type="checkbox" id="ob-share-comments" checked>
+            <span>Näytä omat kommentit joukkueen syötteessä</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary onboarding-submit">Aloita treenikirja →</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Help Modal -->
   <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-backdrop" id="help-backdrop"></div>
