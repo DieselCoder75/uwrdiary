@@ -316,6 +316,127 @@
     </div>
   </div>
 
+  <!-- Help Modal -->
+  <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="help-backdrop"></div>
+    <div class="modal-content help-modal-content">
+      <div class="modal-header">
+        <h2>Käyttöohje</h2>
+        <button id="close-help" aria-label="Sulje">✕</button>
+      </div>
+      <div class="help-version-bar">
+        <span class="help-version">Versio 1.0</span>
+        <span class="help-updated">Päivitetty 12.4.2026</span>
+      </div>
+
+      <div class="help-body">
+
+        <section class="help-section">
+          <h3>📋 Yleistä</h3>
+          <p>UWR Diary on urheilusukeltajien harjoituspäiväkirja. Kirjaa treenit, seuraa kehitystä ja vertaa tuloksia joukkueen kesken.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>➕ Harjoituksen kirjaus</h3>
+          <ul>
+            <li>Paina sinistä <strong>+</strong>-nappia oikeassa alakulmassa</li>
+            <li>Valitse tai kirjoita aktiviteettityyppi</li>
+            <li>Aseta kesto minuuteissa</li>
+            <li>Valitse <strong>tehoalue</strong> (I–V) ja <strong>fiilis</strong></li>
+            <li>Matka, syke ja kommentti ovat valinnaisia</li>
+            <li>Tallenna painamalla <strong>Tallenna</strong></li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>📊 Vertailu-välilehti</h3>
+          <p>Näyttää oman harjoittelusi verrattuna joukkueen keskiarvoon ja huipputekijään. Valitse mittari (minuutit / sessiot) ja suodata tehoalueittain.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>📈 Trendit-välilehti</h3>
+          <p>Viikkokohtaiset kaaviot omasta harjoittelustasi: kesto, sessiot, matka ja syke 12 viikon ajalta.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>👥 Joukkue-välilehti</h3>
+          <p>Reaaliaikainen syöte joukkuekavereittesi viimeisimmistä treeneistä. Voit reagoida harjoituksiin emojireaktioilla. Joukkue valitaan profiilisivulta.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>👤 Profiili</h3>
+          <ul>
+            <li>Aseta nimimerkki, nimi ja profiilikuva</li>
+            <li>Valitse joukkue/joukkueet (monivalinta)</li>
+            <li>Hallitse näkyvyyttä: näkyykö oma treeni joukkueen syötteessä</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🔑 Salasanan palautus</h3>
+          <p>Kirjautumissivulla: kirjoita sähköposti ja paina <strong>Unohditko salasanan?</strong> — palautuslinkki lähetetään sähköpostiisi.</p>
+        </section>
+
+        <hr class="help-divider">
+
+        <section class="help-section help-history">
+          <h3>📝 Versiohistoria</h3>
+
+          <div class="history-entry">
+            <span class="history-version">v1.0</span>
+            <span class="history-date">12.4.2026</span>
+            <ul>
+              <li>CSV-raporttivientitoiminto adminpaneeliin (joukkue- ja pelaajakohtainen)</li>
+              <li>Salasanan palautus kirjautumissivulle</li>
+              <li>Joukkue-välilehden tyhjätila-näkymä urheilijalle joka ei kuulu joukkueeseen</li>
+              <li>Kirjaudu ulos -napin korjaus profiilisivulla</li>
+              <li>Harjoituskortin layout uusittu: kesto ja matka samassa vertikaalisessa linjassa</li>
+              <li>Profiilisivun nappulat yhtenäistetty (sininen teema)</li>
+              <li>Joukkue-näkyvyys-checkboxien fontti yhtenäistetty</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v0.9</span>
+            <span class="history-date">11.4.2026</span>
+            <ul>
+              <li>Joukkue-monivalinta profiilissa (useampi joukkue samanaikaisesti)</li>
+              <li>Reaktioemojit joukkueen treenikorteissa</li>
+              <li>Joukkueen syötteen välimuisti (45 min TTL)</li>
+              <li>Harjoitusten ääretön vieritys joukkue-välilehdellä</li>
+              <li>Vertailu-välilehden tehoaluesuodatin</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v0.8</span>
+            <span class="history-date">9.4.2026</span>
+            <ul>
+              <li>Trendit-välilehti: matka- ja sykekaaviot</li>
+              <li>Harjoituskorttiin matka, keskisyke ja maksimisyke</li>
+              <li>Profiilikuvan lataus (base64, pakkauksella)</li>
+              <li>Paginointi: 4 viikon näkymä kerrallaan</li>
+              <li>Offline-välimuisti (localStorage)</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v0.7</span>
+            <span class="history-date">7.4.2026</span>
+            <ul>
+              <li>Joukkue-välilehti: joukkuekaverien treenivirta</li>
+              <li>Vertailu-välilehti: oma vs. joukkue -kaaviot</li>
+              <li>Tehoalueet I–V ja fiilismittari harjoituksiin</li>
+              <li>Firebase-autentikaatio ja Firestore-tietokanta</li>
+              <li>Adminpaneeli käyttäjien hallintaan</li>
+            </ul>
+          </div>
+
+        </section>
+      </div>
+    </div>
+  </div>
+
   <!-- Admin Panel Modal -->
   <div id="admin-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-backdrop" id="admin-backdrop"></div>
