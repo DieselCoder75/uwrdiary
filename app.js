@@ -312,8 +312,8 @@ auth.onAuthStateChanged(async (user) => {
     // 2. Load from Firestore
     await loadProfile();
 
-    // 3. New user → show onboarding instead of app
-    if (!userProfile.onboardingDone) {
+    // 3. New registration → show onboarding instead of app
+    if (isNewRegistration && !userProfile.onboardingDone) {
       show('onboarding-modal');
       return;
     }
