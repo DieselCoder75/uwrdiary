@@ -949,7 +949,7 @@ el('entry-form').addEventListener('submit', async (e) => {
   const duration = parseInt(el('entry-duration').value, 10);
   if (!duration || duration < 1) { alert('Syötä keston kesto minuutteina.'); return; }
 
-  const distRaw  = parseFloat(el('entry-distance').value);
+  const distRaw  = parseFloat(el('entry-distance').value.replace(',', '.'));
   const hrRaw    = parseInt(el('entry-heartrate').value, 10);
   const maxHrRaw = parseInt(el('entry-maxhr').value, 10);
 
