@@ -199,6 +199,7 @@ function confirm(message) {
 // AUTH VIEW
 // ============================================================
 let isLoginMode = true;
+let isNewRegistration = false;  // set to true only after createUserWithEmailAndPassword
 
 el('login-tab').addEventListener('click', () => {
   isLoginMode = true;
