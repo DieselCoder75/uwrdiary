@@ -1,0 +1,1735 @@
+/* ============================================================
+   Reset & Variables — Finnish Blue & White
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --blue-deep:    #002A6E;   /* Finnish flag dark navy */
+  --blue:         #003F9C;   /* Finnish flag blue      */
+  --blue-mid:     #1A56B0;   /* Medium blue            */
+  --blue-light:   #2E7DD1;   /* Lighter accent         */
+  --blue-pale:    #D6E6FF;   /* Very pale blue         */
+  --blue-ghost:   #EEF4FF;   /* Near-white blue bg     */
+
+  --white:        #FFFFFF;
+  --bg:           #EDF2FB;
+  --surface:      #FFFFFF;
+  --border:       #C8D9F0;
+  --border-light: #E4EDF9;
+
+  --text:         #0A1628;
+  --text-muted:   #4A6290;
+  --text-soft:    #7A96C2;
+
+  --danger:       #D01A1A;
+  --danger-light: #FDEAEA;
+  --success:      #0F7B4B;
+  --warning:      #C97A00;
+
+  --radius:    14px;
+  --radius-sm: 8px;
+  --shadow:    0 2px 8px rgba(0,40,120,0.09), 0 0 0 1px rgba(0,40,120,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,40,120,0.18);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+.hidden { display: none !important; }
+.view   { min-height: 100vh; }
+
+/* ============================================================
+   Auth
+   ============================================================ */
+.auth-container {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  min-height: 100vh;
+  justify-content: center;
+}
+
+.auth-container h1 {
+  font-size: 1.65rem;
+  font-weight: 900;
+  color: var(--blue);
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+
+.auth-tabs {
+  display: flex;
+  background: var(--blue-pale);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  width: 100%;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.55rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--blue-mid);
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: var(--white);
+  font-weight: 700;
+  color: var(--blue);
+  box-shadow: 0 1px 4px rgba(0,40,120,0.15);
+}
+
+#auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+#auth-form input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  background: var(--white);
+  color: var(--text);
+}
+
+#auth-form input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,63,156,0.12);
+}
+
+#auth-submit {
+  padding: 0.9rem;
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 0.25rem;
+  letter-spacing: 0.03em;
+}
+
+#auth-submit:active {
+  background: var(--blue-deep);
+  transform: scale(0.98);
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+/* ============================================================
+   App Top Bar (header + nav, sticky together)
+   ============================================================ */
+.app-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 12px rgba(0,40,120,0.22);
+}
+
+/* ============================================================
+   App Header
+   ============================================================ */
+header {
+  background: linear-gradient(135deg, var(--blue-deep) 0%, var(--blue) 100%);
+  color: white;
+  padding: 0.85rem 1rem;
+  padding-top: max(0.85rem, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+header h1 {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.95;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+#header-firstname {
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.9;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* Avatar button in header */
+.avatar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: border-color 0.2s, background 0.2s;
+  padding: 0;
+}
+
+.avatar-btn:active {
+  border-color: white;
+  background: rgba(255,255,255,0.3);
+}
+
+.avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#header-initials {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: white;
+  line-height: 1;
+}
+
+
+/* ============================================================
+   Navigation Tabs
+   ============================================================ */
+.nav-tabs {
+  display: flex;
+  background: var(--blue-deep);
+}
+
+.nav-tab {
+  flex: 1;
+  padding: 0.62rem 0.25rem;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 3px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+}
+
+.nav-tab.active {
+  color: white;
+  border-bottom-color: #5BB8FF;
+  background: rgba(255,255,255,0.07);
+}
+
+.nav-tab:active { background: rgba(255,255,255,0.13); }
+
+/* ============================================================
+   Tab Content
+   ============================================================ */
+.tab-content { display: block; }
+
+/* ============================================================
+   Charts
+   ============================================================ */
+.chart-legend {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem 5px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.chart-section {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 0.9rem 0.85rem 0.6rem;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-light);
+}
+
+.chart-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--blue-mid);
+  margin-bottom: 0.55rem;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 180px;
+}
+
+.chart-wrap canvas { display: block; }
+
+/* ============================================================
+   Main / List
+   ============================================================ */
+main {
+  padding: 1rem;
+  padding-bottom: 5.5rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ============================================================
+   Period label & refresh toolbar
+   ============================================================ */
+.treenit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0 0.5rem;
+}
+
+.period-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--blue-mid);
+}
+
+.refresh-btn {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.4rem;
+  font-size: 1.1rem;
+  color: var(--blue-mid);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: color 0.15s, transform 0.15s;
+}
+
+.refresh-btn:hover { color: var(--blue); }
+.refresh-btn:disabled { opacity: 0.4; cursor: default; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.refresh-btn.spinning { animation: spin 0.7s linear infinite; }
+
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0 0.5rem;
+}
+
+.load-more-btn {
+  background: var(--white);
+  color: var(--blue);
+  border: 2px solid var(--blue);
+  border-radius: var(--radius);
+  padding: 0.65rem 1.5rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, color 0.15s;
+  touch-action: manipulation;
+}
+
+.load-more-btn:active {
+  background: var(--blue);
+  color: white;
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.no-more-entries {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  padding: 0.5rem 0 0.25rem;
+  font-weight: 600;
+}
+
+/* ============================================================
+   Entry Cards
+   ============================================================ */
+.entry-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 0;
+  margin-bottom: 0.65rem;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  display: flex;
+}
+
+.entry-card:active {
+  transform: scale(0.982);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Left accent stripe */
+.entry-card-stripe {
+  width: 5px;
+  flex-shrink: 0;
+  background: var(--blue);
+}
+
+.entry-card-body {
+  flex: 1;
+  padding: 0.9rem 1rem;
+  min-width: 0;
+}
+
+.entry-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.4rem;
+  gap: 0.5rem;
+}
+
+/* Shared 3-column grid for both the meta row and extra row.
+   Both rows are direct children, so col-1 widths always match. */
+.entry-stats-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 0.5rem;
+  row-gap: 0.2rem;
+  align-items: center;
+  margin-bottom: 0.1rem;
+}
+
+.entry-type {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--blue-deep);
+  letter-spacing: -0.2px;
+}
+
+.entry-date {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-top: 2px;
+  font-weight: 600;
+}
+
+/* Col 1: duration / distance — left-aligned (default) */
+.entry-duration,
+.extra-col1 {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Col 2: perf badge / avg HR — centered, text-width */
+.stats-center {
+  justify-self: center;
+  display: flex;
+  justify-content: center;
+}
+
+.extra-col2 {
+  justify-self: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Col 3: feel badge / max HR — right-aligned */
+.stats-right,
+.extra-col3 {
+  justify-self: end;
+}
+
+.extra-col3 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.entry-perf-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.18rem 0.5rem;
+  border-radius: 20px;
+  background: var(--blue-pale);
+  color: var(--blue);
+  letter-spacing: 0.04em;
+}
+
+.entry-feel-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.18rem 0.5rem;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.entry-comment {
+  margin-top: 0.35rem;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  border-top: 1px solid var(--border-light);
+  padding-top: 0.45rem;
+}
+
+/* Reaction display on own entries (read-only) */
+.own-reactions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-light);
+}
+.own-reaction-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 20px;
+  background: var(--blue-pale);
+  color: var(--blue);
+  border: 1px solid rgba(0,63,156,0.15);
+}
+
+/* ============================================================
+   Empty State
+   ============================================================ */
+#empty-state {
+  text-align: center;
+  padding: 4rem 1rem 2rem;
+  color: var(--text-muted);
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+}
+
+#empty-state p {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.empty-sub {
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  color: var(--text-muted) !important;
+  margin-top: 0.35rem;
+}
+
+/* ============================================================
+   Loading
+   ============================================================ */
+.loading {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ============================================================
+   FAB
+   ============================================================ */
+.fab {
+  position: fixed;
+  bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem));
+  right: max(1.5rem, env(safe-area-inset-right));
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-light) 100%);
+  color: white;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0,63,156,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  z-index: 20;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.fab:active {
+  transform: scale(0.92);
+  box-shadow: 0 2px 8px rgba(0,63,156,0.35);
+}
+
+/* ============================================================
+   Modal (bottom sheet)
+   ============================================================ */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,20,60,0.6);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--white);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.25rem 1rem 1.5rem;
+  border-top: 3px solid var(--blue);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.modal-header h2 {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--blue-deep);
+  letter-spacing: -0.3px;
+  text-transform: uppercase;
+}
+
+#close-modal, #close-profile, #close-admin {
+  background: var(--blue-ghost);
+  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue-mid);
+  font-weight: 700;
+  transition: background 0.2s;
+}
+
+#close-modal:active, #close-profile:active, #close-admin:active {
+  background: var(--blue-pale);
+}
+
+/* ============================================================
+   Form
+   ============================================================ */
+.form-group {
+  margin-bottom: 1.1rem;
+}
+
+.form-group > label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--blue-mid);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.label-optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.form-group input[type="date"],
+.form-group input[type="time"],
+.form-group input[type="number"],
+.form-group input[type="text"],
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-group select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%231A56B0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2.5rem;
+}
+
+/* ============================================================
+   Combobox (activity type search)
+   ============================================================ */
+.combobox-wrap {
+  position: relative;
+}
+
+.combobox-wrap input[type="text"] {
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%231A56B0' d='M6 8L0 0h12z'/%3E%3C/svg%3E") no-repeat right 0.85rem center;
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+}
+
+.combobox-wrap input[type="text"]:focus {
+  border-color: var(--blue);
+  background-color: var(--white);
+  box-shadow: 0 0 0 3px var(--blue-pale);
+}
+
+.combobox-list {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--white, #ffffff);
+  border: 2px solid var(--blue);
+  border-radius: var(--radius-sm);
+  max-height: 55vh;
+  overflow-y: auto;
+  z-index: 1000;
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+}
+
+.combobox-list.open {
+  display: block;
+}
+
+.combobox-group {
+  padding: 0.35rem 0.85rem 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.combobox-item {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.combobox-item:hover,
+.combobox-item.highlighted {
+  background: var(--blue-pale);
+  color: var(--blue);
+}
+
+.combobox-item mark {
+  background: transparent;
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.combobox-empty {
+  padding: 0.75rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  pointer-events: none;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--blue);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(0,63,156,0.1);
+}
+
+.form-group textarea {
+  resize: none;
+  line-height: 1.5;
+}
+
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.date-row input[type="date"] { flex: 1; }
+
+.toggle-label {
+  display: flex !important;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  color: var(--blue-mid) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+/* ============================================================
+   Star Rating (Feeling)
+   ============================================================ */
+.feel-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.feel-btn {
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 1.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  touch-action: manipulation;
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.feel-btn.active {
+  border-color: #10b981;
+  box-shadow: 0 3px 10px rgba(16,185,129,0.35);
+  opacity: 1;
+  filter: none;
+  transform: scale(1.08);
+}
+
+.feel-btn:active { transform: scale(0.93); }
+
+/* ============================================================
+   Performance Roman Numeral Buttons
+   ============================================================ */
+.perf-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.perf-btn {
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  touch-action: manipulation;
+  letter-spacing: 0.5px;
+}
+
+.perf-btn.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  box-shadow: 0 3px 10px rgba(0,63,156,0.4);
+}
+
+.perf-btn:active { transform: scale(0.93); }
+
+.perf-desc {
+  margin-top: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--blue);
+  min-height: 1.3em;
+}
+
+/* ============================================================
+   Form Actions
+   ============================================================ */
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  /* No horizontal padding — inherits modal-content's 1rem padding */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Profile form save button spans full width like the buttons below it */
+#profile-form .form-actions {
+  margin-bottom: 0;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 0.9rem;
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  letter-spacing: 0.03em;
+}
+
+.btn-primary:active {
+  background: var(--blue-deep);
+  transform: scale(0.98);
+}
+
+.btn-danger {
+  padding: 0.9rem 1.1rem;
+  background: var(--danger-light);
+  color: var(--danger);
+  border: 2px solid var(--danger);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-danger:active {
+  background: var(--danger);
+  color: white;
+}
+
+/* ============================================================
+   Confirm Dialog
+   ============================================================ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,20,60,0.6);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.confirm-box {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: var(--shadow-lg);
+  border-top: 4px solid var(--blue);
+}
+
+.confirm-box p {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  text-align: center;
+  color: var(--text);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--blue-ghost);
+  color: var(--blue-mid);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-secondary:active { background: var(--blue-pale); }
+
+.btn-danger-solid {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-danger-solid:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-danger-solid:not(:disabled):active { opacity: 0.85; }
+
+/* ============================================================
+   Profile Modal — Avatar upload section
+   ============================================================ */
+.avatar-upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0 1.25rem;
+}
+
+.avatar-large {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--blue-pale);
+  border: 3px solid var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 2.2rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(0,63,156,0.2);
+}
+
+.avatar-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#avatar-preview-initials {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.profile-username {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  margin: -0.25rem 0 0.25rem;
+  text-align: center;
+  word-break: break-all;
+}
+
+.avatar-upload-btn {
+  display: inline-block;
+  padding: 0.45rem 1.1rem;
+  background: var(--blue-ghost);
+  color: var(--blue);
+  border-radius: 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 1.5px solid var(--blue-pale);
+}
+
+.avatar-upload-btn:active { background: var(--blue-pale); }
+
+.avatar-remove {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0;
+}
+
+.avatar-hint {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  text-align: center;
+  margin: -0.2rem 0 0;
+}
+
+.avatar-size-hint {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success);
+}
+
+/* Extra action buttons below the profile form */
+.profile-extra-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem 0 1.25rem;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Shared base for full-width profile action buttons */
+.profile-extra-actions .btn-primary,
+.btn-danger-outline {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  text-align: center;
+  display: block;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.btn-danger-outline {
+  background: var(--danger);
+  color: white;
+  border: none;
+}
+
+.btn-danger-outline:active { opacity: 0.82; }
+
+/* ============================================================
+   Admin panel sections & CSV export
+   ============================================================ */
+.admin-section {
+  border-top: 1px solid var(--border-light);
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.admin-section-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--blue-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.75rem;
+}
+
+.admin-csv-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.admin-select {
+  flex: 1;
+  padding: 0.65rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  background: var(--white);
+  color: var(--text);
+}
+
+.admin-csv-btn {
+  flex-shrink: 0;
+  padding: 0.65rem 1rem;
+  font-size: 0.88rem;
+}
+
+/* ============================================================
+   Admin user list
+   ============================================================ */
+.admin-user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-light);
+  gap: 0.5rem;
+}
+
+.admin-user-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.btn-csv-sm {
+  padding: 0.4rem 0.75rem;
+  background: var(--blue-ghost);
+  color: var(--blue-mid);
+  border: 1.5px solid var(--blue-pale);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-csv-sm:hover { background: var(--blue-pale); }
+.btn-csv-sm:disabled { opacity: 0.5; cursor: default; }
+
+.admin-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.admin-user-email {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-name {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Danger confirm dialog
+   ============================================================ */
+.danger-confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-top-color: var(--danger) !important;
+}
+
+.danger-msg {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--danger);
+  text-align: center;
+  margin: 0;
+}
+
+.danger-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+}
+
+#danger-confirm-input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  background: var(--bg);
+}
+
+#danger-confirm-input:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(208,26,26,0.1);
+}
+
+/* ============================================================
+   Safe area / notch support
+   ============================================================ */
+.fab {
+  bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem));
+  right: max(1.5rem, env(safe-area-inset-right));
+}
+
+/* ============================================================
+   Team multi-select checkboxes (profile)
+   ============================================================ */
+.team-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.team-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+/* Gap between consecutive checkboxes not wrapped in a group div */
+.team-checkbox-item + .team-checkbox-item {
+  margin-top: 0.45rem;
+}
+
+/* Reset margin when inside .team-checkbox-group (gap handles spacing there) */
+.team-checkbox-group .team-checkbox-item + .team-checkbox-item {
+  margin-top: 0;
+}
+
+.team-checkbox-item:has(input:checked) {
+  border-color: var(--blue);
+  background: rgba(0,63,156,0.06);
+}
+
+.team-checkbox-item span {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.team-checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* ============================================================
+   Vertailu perf filter
+   ============================================================ */
+.vertailu-perf-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem 0 0.5rem;
+}
+.vertailu-perf-filter .filter-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.vertailu-perf-filter .perf-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+/* Perf buttons fill full width in filter */
+.vertailu-perf-filter .perf-btn {
+  flex: 1;
+  height: 44px;
+  font-size: 0.78rem;
+  width: auto;
+}
+
+/* ============================================================
+   Vertailu KPI row
+   ============================================================ */
+.vertailu-kpi-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  padding: 0.5rem 0 0.25rem;
+}
+.vertailu-kpi-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: var(--white);
+}
+.vertailu-kpi-card.active {
+  border-color: var(--blue);
+  box-shadow: 0 2px 8px rgba(0,63,156,0.15);
+}
+.vertailu-kpi-card .kpi-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+.vertailu-kpi-card .kpi-value {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--blue-deep);
+  line-height: 1.1;
+}
+.vertailu-kpi-card .kpi-unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.vertailu-kpi-card .kpi-deltas {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.vertailu-kpi-card .kpi-delta {
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.kpi-delta.positive { color: #15803d; }
+.kpi-delta.negative { color: #b91c1c; }
+.kpi-delta.neutral  { color: var(--text-muted); }
+
+/* ============================================================
+   Vertailu notice (no team selected)
+   ============================================================ */
+.vertailu-notice {
+  margin: 0.5rem 0 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0,63,156,0.06);
+  border-left: 3px solid var(--blue);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Joukkue feed
+   ============================================================ */
+.joukkue-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.5rem;
+}
+
+.joukkue-entry-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.joukkue-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem 0.4rem;
+}
+
+.joukkue-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--blue-pale);
+  color: var(--blue);
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.joukkue-avatar-sm img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.joukkue-member-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--blue-deep);
+  flex: 1;
+}
+
+.joukkue-entry-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.joukkue-entry-body {
+  padding: 0 0.85rem 0.5rem;
+  border-top: 1px solid var(--border-light);
+  margin-top: 0.3rem;
+  padding-top: 0.45rem;
+}
+
+.joukkue-entry-type {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 0.3rem;
+}
+
+.joukkue-entry-meta {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.joukkue-entry-meta .entry-feel-badge {
+  justify-self: end;
+}
+
+.joukkue-reactions {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem 0.6rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-light);
+}
+
+.reaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  touch-action: manipulation;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.reaction-btn.active {
+  border-color: var(--blue);
+  background: var(--blue-pale);
+  color: var(--blue);
+}
+
+.reaction-btn .reaction-count {
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+/* ============================================================
+   Entry extra fields (distance / HR) — form + card
+   ============================================================ */
+.form-extra {
+  margin-bottom: 1.1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.form-extra-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: var(--white, #ffffff);
+}
+
+.form-extra-toggle::-webkit-details-marker { display: none; }
+
+.form-extra-toggle::after {
+  content: '›';
+  margin-left: auto;
+  font-size: 1rem;
+  font-weight: 400;
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+
+details[open] .form-extra-toggle::after {
+  transform: rotate(90deg);
+}
+
+.form-extra-content {
+  padding: 0.75rem 0.85rem 0;
+  background: var(--white, #ffffff);
+  border-top: 1px solid var(--border);
+}
+
+.form-extra-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.form-extra-row .form-group {
+  margin-bottom: 0.85rem;
+}
+
+
+/* ── Joukkue: no-team state ─────────────────────────────────── */
+.joukkue-no-team-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2.5rem 1.5rem 2rem;
+  gap: 0.5rem;
+}
+
+.joukkue-no-team-icon {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.joukkue-no-team-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.joukkue-no-team-desc {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.5;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.joukkue-join-btn {
+  margin-top: 0.25rem;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.9rem;
+}
+
+/* ── Auth: forgot password ─────────────────────────────────── */
+.forgot-wrap {
+  text-align: center;
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}
+
+.forgot-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.forgot-btn:hover {
+  color: var(--primary-dark, #4338ca);
+}
+
+.forgot-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.forgot-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin-top: 0.5rem;
+  text-align: center;
+}

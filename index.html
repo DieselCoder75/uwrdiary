@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="manifest.json">
+  <title>UWR Diary</title>
+  <link rel="stylesheet" href="styles.css?v=147">
+</head>
+<body>
+
+  <!-- Auth View -->
+  <div id="auth-view" class="view">
+    <div class="auth-container">
+      <h1>UWR Diary</h1>
+      <div class="auth-tabs">
+        <button class="tab-btn active" id="login-tab">Kirjaudu</button>
+        <button class="tab-btn" id="register-tab">Rekisteröidy</button>
+      </div>
+      <form id="auth-form">
+        <input type="email" id="auth-email" placeholder="Sähköposti" required autocomplete="email">
+        <input type="password" id="auth-password" placeholder="Salasana" required minlength="6" autocomplete="current-password">
+        <button type="submit" id="auth-submit">Kirjaudu</button>
+      </form>
+      <p id="auth-error" class="error"></p>
+      <p id="forgot-wrap" class="forgot-wrap">
+        <button type="button" id="forgot-btn" class="forgot-btn">Unohditko salasanan?</button>
+      </p>
+      <p id="forgot-success" class="forgot-success hidden"></p>
+    </div>
+  </div>
+
+  <!-- App View -->
+  <div id="app-view" class="view hidden">
+
+    <!-- Sticky top bar: header + nav tabs -->
+    <div class="app-top-bar">
+      <header>
+        <h1>UWR Diary</h1>
+        <div class="header-actions">
+          <span id="header-firstname"></span>
+          <button id="profile-btn" class="avatar-btn" aria-label="Profiili">
+            <img id="header-avatar" class="hidden" alt="Profiilikuva">
+            <span id="header-initials"></span>
+          </button>
+        </div>
+      </header>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="treenit">Treenit</button>
+        <button class="nav-tab" data-tab="trendit">Trendit</button>
+        <button class="nav-tab" data-tab="vertailu">Vertailu</button>
+        <button class="nav-tab" data-tab="joukkue">Joukkue</button>
+      </nav>
+    </div>
+
+    <main>
+
+      <!-- Tab: Treenit -->
+      <div id="tab-treenit" class="tab-content">
+        <div class="treenit-toolbar">
+          <span id="period-label" class="period-label"></span>
+          <button id="refresh-btn" class="refresh-btn" title="Päivitä treenit" aria-label="Päivitä">↻</button>
+        </div>
+        <div id="entries-list"></div>
+        <div id="empty-state" class="hidden">
+          <div class="empty-icon">🏅</div>
+          <p>Sinulla ei ole yhtään kirjattu treeniä.</p>
+          <p class="empty-sub">Lisää ensimmäinen harjoitus + painikkeella!</p>
+        </div>
+        <div id="load-more-wrap" class="load-more-wrap hidden">
+          <button id="load-more-btn" class="load-more-btn">Lataa aiemmat 4 viikkoa</button>
+        </div>
+        <div id="no-more-entries" class="no-more-entries hidden">Kaikki treenit ladattu</div>
+      </div>
+
+      <!-- Tab: Vertailu -->
+      <div id="tab-vertailu" class="tab-content hidden">
+        <!-- Perf zone filter -->
+        <div class="vertailu-perf-filter">
+          <span class="filter-label">Tehoalue:</span>
+          <div class="perf-btns" id="vertailu-perf-btns"></div>
+        </div>
+        <!-- KPI cards -->
+        <div class="vertailu-kpi-row" id="vertailu-kpi-row"></div>
+        <!-- Legend + no-team notice -->
+        <div class="chart-legend" id="vertailu-legend"></div>
+        <div id="vertailu-no-team" class="vertailu-notice hidden">
+          👥 Lisää joukkue profiilissasi nähdäksesi joukkueen vertailun.
+        </div>
+        <!-- Chart -->
+        <div class="chart-section">
+          <p class="chart-title" id="vertailu-chart-title">Minuutit – viimeiset 12 viikkoa</p>
+          <div class="chart-wrap"><canvas id="chart-vertailu-minutes"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Tab: Trendit -->
+      <div id="tab-trendit" class="tab-content hidden">
+        <div class="chart-legend" id="trendit-legend"></div>
+        <div class="chart-section">
+          <p class="chart-title">Minuutit – Viikko – Viimeiset 12 viikkoa</p>
+          <div class="chart-wrap"><canvas id="chart-weekly-minutes"></canvas></div>
+        </div>
+        <div class="chart-section">
+          <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
+          <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Tab: Joukkue -->
+      <div id="tab-joukkue" class="tab-content hidden">
+        <div id="joukkue-no-team" class="joukkue-no-team-notice hidden">
+          <div class="joukkue-no-team-icon">👥</div>
+          <p class="joukkue-no-team-title">Et ole vielä missään joukkueessa</p>
+          <p class="joukkue-no-team-desc">Täällä näet joukkuekavereittesi treenit reaaliajassa. Liity joukkueeseen profiilisivultasi ja pidä kaverit motivoituneina!</p>
+          <button type="button" id="joukkue-open-profile-btn" class="btn-primary joukkue-join-btn">Avaa profiili</button>
+        </div>
+        <div class="treenit-toolbar">
+          <span id="joukkue-period-label" class="period-label"></span>
+          <button id="joukkue-refresh-btn" class="refresh-btn" title="Päivitä joukkueen treenit" aria-label="Päivitä">↻</button>
+        </div>
+        <div id="joukkue-feed" class="joukkue-feed"></div>
+      </div>
+
+    </main>
+
+    <button id="add-btn" class="fab" aria-label="Lisää harjoitus">+</button>
+  </div>
+
+  <!-- Entry Modal -->
+  <div id="entry-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Uusi Treeni</h2>
+        <button id="close-modal" aria-label="Sulje">✕</button>
+      </div>
+      <form id="entry-form" novalidate>
+
+        <div class="form-group">
+          <label>Päivämäärä</label>
+          <div class="date-row">
+            <input type="date" id="entry-date" required>
+            <label class="toggle-label">
+              <input type="checkbox" id="show-time"> Aika
+            </label>
+          </div>
+          <input type="time" id="entry-time" class="hidden" style="margin-top:0.5rem">
+        </div>
+
+        <div class="form-group">
+          <label>Aktiviteetti</label>
+          <div class="combobox-wrap" id="entry-type-wrap">
+            <input type="text" id="entry-type" autocomplete="off" spellcheck="false"
+                   placeholder="Valitse tai kirjoita laji…" role="combobox"
+                   aria-expanded="false" aria-controls="entry-type-list">
+            <ul class="combobox-list" id="entry-type-list" role="listbox"></ul>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Kesto (minuuttia)</label>
+          <input type="number" id="entry-duration" min="1" max="999" placeholder="60" required inputmode="numeric">
+        </div>
+
+        <div class="form-group">
+          <label>Tehoalue</label>
+          <div class="perf-btns" id="perf-stars"></div>
+          <p id="perf-desc" class="perf-desc"></p>
+        </div>
+
+        <div class="form-group">
+          <label>Fiilis</label>
+          <div class="feel-btns" id="feel-stars"></div>
+          <p id="feel-desc" class="perf-desc"></p>
+        </div>
+
+        <div class="form-group">
+          <label>Kommentti <span class="label-optional">(valinnainen)</span></label>
+          <textarea id="entry-comment" rows="3" placeholder="Muistiinpanoja harjoituksesta…"></textarea>
+        </div>
+
+        <details id="entry-extra" class="form-extra">
+          <summary class="form-extra-toggle">Lisätiedot</summary>
+          <div class="form-extra-content">
+            <div class="form-extra-row">
+              <div class="form-group">
+                <label>Matka<br><span class="label-optional">(km)</span></label>
+                <input type="number" id="entry-distance" min="0" max="9999" step="0.1" placeholder="0.0" inputmode="decimal">
+              </div>
+              <div class="form-group">
+                <label>Keskisyke<br><span class="label-optional">(bpm)</span></label>
+                <input type="number" id="entry-heartrate" min="30" max="250" placeholder="—" inputmode="numeric">
+              </div>
+              <div class="form-group">
+                <label>Maksimisyke<br><span class="label-optional">(bpm)</span></label>
+                <input type="number" id="entry-maxhr" min="30" max="250" placeholder="—" inputmode="numeric">
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button type="button" id="delete-entry-btn" class="btn-danger hidden">Poista</button>
+          <button type="submit" class="btn-primary">Tallenna</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="profile-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Profiili</h2>
+        <button id="close-profile" aria-label="Sulje">✕</button>
+      </div>
+      <form id="profile-form" novalidate>
+
+        <div class="avatar-upload-section">
+          <div class="avatar-large" id="avatar-preview-wrap">
+            <img id="avatar-preview" class="hidden" alt="Profiilikuva">
+            <span id="avatar-preview-initials">👤</span>
+          </div>
+          <p id="profile-username-display" class="profile-username"></p>
+          <label class="avatar-upload-btn">
+            Vaihda kuva
+            <input type="file" id="avatar-file" accept="image/*" style="display:none">
+          </label>
+          <p class="avatar-hint">Suositus: neliö (1:1) · max 100 KB</p>
+          <span id="avatar-size-hint" class="avatar-size-hint"></span>
+          <button type="button" id="remove-avatar-btn" class="avatar-remove hidden">Poista kuva</button>
+        </div>
+
+        <div class="form-group">
+          <label>Lempinimi <span class="label-optional">(valinnainen)</span></label>
+          <input type="text" id="profile-nickname" placeholder="Lempinimi" autocomplete="nickname">
+        </div>
+
+        <div class="form-group">
+          <label>Etunimi <span class="label-optional">(valinnainen)</span></label>
+          <input type="text" id="profile-firstname" placeholder="Etunimi" autocomplete="given-name">
+        </div>
+
+        <div class="form-group">
+          <label>Sukunimi <span class="label-optional">(valinnainen)</span></label>
+          <input type="text" id="profile-lastname" placeholder="Sukunimi" autocomplete="family-name">
+        </div>
+
+        <div class="form-group">
+          <label>Sukupuoli <span class="label-optional">(valinnainen)</span></label>
+          <select id="profile-gender">
+            <option value="">Valitse…</option>
+            <option value="Mies">Mies</option>
+            <option value="Nainen">Nainen</option>
+            <option value="Muu">Muu</option>
+            <option value="En halua kertoa">En halua kertoa</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Syntymäpäivä <span class="label-optional">(valinnainen)</span></label>
+          <input type="date" id="profile-birthday">
+          <p id="profile-age-display" class="perf-desc"></p>
+        </div>
+
+        <div class="form-group">
+          <label>Joukkue <span class="label-optional">(valinnainen, monivalinta)</span></label>
+          <div class="team-checkbox-group">
+            <label class="team-checkbox-item">
+              <input type="checkbox" name="profile-team" value="Naisten Maajoukkue">
+              <span>Naisten Maajoukkue</span>
+            </label>
+            <label class="team-checkbox-item">
+              <input type="checkbox" name="profile-team" value="Urheilusukeltajat">
+              <span>Urheilusukeltajat</span>
+            </label>
+            <label class="team-checkbox-item">
+              <input type="checkbox" name="profile-team" value="PSK-Kupla">
+              <span>PSK-Kupla</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Joukkue-näkyvyys</label>
+          <label class="team-checkbox-item">
+            <input type="checkbox" id="profile-share-activities">
+            <span>Näytä omat aktiviteetit joukkueen syötteessä</span>
+          </label>
+          <label class="team-checkbox-item">
+            <input type="checkbox" id="profile-share-comments">
+            <span>Näytä omat kommentit joukkueen syötteessä</span>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Tallenna</button>
+        </div>
+
+      </form>
+
+      <!-- Admin + Delete own account buttons below form -->
+      <div class="profile-extra-actions">
+        <button id="admin-panel-btn" class="btn-primary hidden">Hallintapaneeli</button>
+        <button id="logout-btn" class="btn-primary">Kirjaudu ulos</button>
+        <button id="delete-own-account-btn" class="btn-danger-outline">Poista oma tili ja kaikki tiedot</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Admin Panel Modal -->
+  <div id="admin-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="admin-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Hallintapaneeli</h2>
+        <button id="close-admin" aria-label="Sulje">✕</button>
+      </div>
+
+      <!-- CSV export section -->
+      <div class="admin-section">
+        <h3 class="admin-section-title">CSV-raportti joukkueelle</h3>
+        <div class="admin-csv-row">
+          <select id="admin-csv-team" class="admin-select">
+            <option value="">Valitse joukkue…</option>
+            <option value="Naisten Maajoukkue">Naisten Maajoukkue</option>
+            <option value="Urheilusukeltajat">Urheilusukeltajat</option>
+            <option value="PSK-Kupla">PSK-Kupla</option>
+          </select>
+          <button id="admin-csv-team-btn" class="btn-primary admin-csv-btn">Lataa CSV</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="admin-section-title">Käyttäjät</h3>
+        <div id="admin-user-list">
+          <p class="loading">Ladataan käyttäjiä…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Danger Confirm Dialog (typed confirmation) -->
+  <div id="danger-dialog" class="confirm-overlay hidden">
+    <div class="confirm-box danger-confirm-box">
+      <p id="danger-dialog-msg" class="danger-msg"></p>
+      <p class="danger-hint">Vahvistaaksesi kirjoita <strong>Poista</strong> alle:</p>
+      <input type="text" id="danger-confirm-input" placeholder="Poista" autocomplete="off">
+      <div class="confirm-actions">
+        <button id="danger-cancel" class="btn-secondary">Peruuta</button>
+        <button id="danger-ok" class="btn-danger-solid" disabled>Poista</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Dialog -->
+  <div id="confirm-dialog" class="confirm-overlay hidden">
+    <div class="confirm-box">
+      <p>Poistetaanko tämä harjoitus?</p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="btn-secondary">Peruuta</button>
+        <button id="confirm-ok" class="btn-danger-solid">Poista</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js?v=147"></script>
+</body>
+</html>
