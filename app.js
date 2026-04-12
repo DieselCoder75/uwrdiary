@@ -354,6 +354,7 @@ el('onboarding-form').addEventListener('submit', async (e) => {
     userProfile = { ...userProfile, ...profile };
     Cache.set(currentUser.uid, 'profile', userProfile);
     updateHeaderProfile();
+    isNewRegistration = false;
     hide('onboarding-modal');
     show('app-view');
     loadEntries();
