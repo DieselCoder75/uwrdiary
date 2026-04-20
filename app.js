@@ -698,6 +698,7 @@ function showOwnEntryReactions(allDocs) {
 el('add-btn').addEventListener('click', () => openModal());
 el('close-modal').addEventListener('click', closeModal);
 el('entry-modal').querySelector('.modal-backdrop').addEventListener('click', closeModal);
+el('entry-comment').addEventListener('input', updateCommentCounter);
 
 function openModal(entryId = null, data = null) {
   currentEntryId = entryId;
