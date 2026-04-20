@@ -1737,7 +1737,7 @@ details[open] .form-extra-toggle::after {
 .forgot-btn {
   background: none;
   border: none;
-  color: var(--primary);
+  color: var(--blue);
   font-size: 0.88rem;
   cursor: pointer;
   padding: 0.2rem 0;
@@ -1746,7 +1746,7 @@ details[open] .form-extra-toggle::after {
 }
 
 .forgot-btn:hover {
-  color: var(--primary-dark, #4338ca);
+  color: var(--blue-deep);
 }
 
 .forgot-btn:disabled {
