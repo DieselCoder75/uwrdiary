@@ -1688,6 +1688,15 @@ function updateHeaderProfile() {
 }
 
 el('help-btn').addEventListener('click', () => {
+  // Populate version bar dynamically
+  const vMatch = document.querySelector('link[href*="styles.css"]')
+    ?.getAttribute('href')?.match(/v=(\d+)/);
+  const build = vMatch ? vMatch[1] : '—';
+  const updated = new Date(document.lastModified)
+    .toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric', year: 'numeric' });
+  el('help-version-text').textContent  = `Versio 1.0 (build ${build})`;
+  el('help-updated-text').textContent  = `Päivitetty ${updated}`;
+
   show('help-modal');
   document.body.style.overflow = 'hidden';
 });
