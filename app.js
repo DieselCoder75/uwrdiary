@@ -1564,6 +1564,12 @@ async function renderVertailuCharts() {
 async function renderTrenditCharts() {
   if (!allChartEntries.length) await fetchChartEntries();
 
+  // Show empty state if no entries at all
+  const isEmpty = allChartEntries.length === 0;
+  el('trendit-empty').classList.toggle('hidden', !isEmpty);
+  el('trendit-charts').classList.toggle('hidden', isEmpty);
+  if (isEmpty) return;
+
   // Build legend
   const legendEl = el('trendit-legend');
   legendEl.innerHTML = PERF_ROMAN.map((r, i) =>
