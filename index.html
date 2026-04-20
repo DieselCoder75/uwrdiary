@@ -329,20 +329,7 @@
 
         <div class="form-group">
           <label>Joukkue <span class="label-hint">(valinnainen, monivalinta)</span></label>
-          <div class="team-checkbox-group">
-            <label class="team-checkbox-item">
-              <input type="checkbox" name="ob-team" value="Naisten Maajoukkue">
-              <span>Naisten Maajoukkue</span>
-            </label>
-            <label class="team-checkbox-item">
-              <input type="checkbox" name="ob-team" value="Urheilusukeltajat">
-              <span>Urheilusukeltajat</span>
-            </label>
-            <label class="team-checkbox-item">
-              <input type="checkbox" name="ob-team" value="PSK-Kupla">
-              <span>PSK-Kupla</span>
-            </label>
-          </div>
+          <div class="team-checkbox-group" id="ob-team-group"></div>
         </div>
 
         <div class="form-group">
@@ -499,9 +486,6 @@
           <select id="admin-csv-team" class="admin-select">
             <option value="">Valitse joukkue…</option>
             <option value="__ALL__">Kaikki pelaajat</option>
-            <option value="Naisten Maajoukkue">Naisten Maajoukkue</option>
-            <option value="Urheilusukeltajat">Urheilusukeltajat</option>
-            <option value="PSK-Kupla">PSK-Kupla</option>
           </select>
           <button id="admin-csv-team-btn" class="btn-primary admin-csv-btn">Lataa CSV</button>
         </div>
