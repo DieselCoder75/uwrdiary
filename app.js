@@ -721,6 +721,7 @@ function openModal(entryId = null, data = null) {
   // Other fields
   el('entry-duration').value  = data?.duration || 60;
   el('entry-comment').value   = data?.comment  || '';
+  updateCommentCounter();
   el('entry-distance').value  = data?.distance != null ? String(data.distance).replace('.', ',') : '';
   el('entry-heartrate').value = data?.avgHr    != null ? data.avgHr    : '';
   el('entry-maxhr').value     = data?.maxHr    != null ? data.maxHr    : '';
