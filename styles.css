@@ -880,6 +880,24 @@ main {
   line-height: 1.5;
 }
 
+.char-counter {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  text-align: right;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.char-counter.near-limit {
+  color: var(--warning);
+}
+
+.char-counter.at-limit {
+  color: var(--danger);
+  font-weight: 800;
+}
+
 .date-row {
   display: flex;
   align-items: center;
