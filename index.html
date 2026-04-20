@@ -101,14 +101,21 @@
 
       <!-- Tab: Trendit -->
       <div id="tab-trendit" class="tab-content hidden">
-        <div class="chart-legend" id="trendit-legend"></div>
-        <div class="chart-section">
-          <p class="chart-title">Minuutit – Viikko – Viimeiset 12 viikkoa</p>
-          <div class="chart-wrap"><canvas id="chart-weekly-minutes"></canvas></div>
+        <div id="trendit-empty" class="trendit-empty hidden">
+          <div class="empty-icon">📈</div>
+          <p>Ei vielä treenejä</p>
+          <p class="empty-sub">Kirjaa ensimmäinen harjoitus ja seuraa kehitystäsi täällä.</p>
         </div>
-        <div class="chart-section">
-          <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
-          <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
+        <div id="trendit-charts">
+          <div class="chart-legend" id="trendit-legend"></div>
+          <div class="chart-section">
+            <p class="chart-title">Minuutit – Viikko – Viimeiset 12 viikkoa</p>
+            <div class="chart-wrap"><canvas id="chart-weekly-minutes"></canvas></div>
+          </div>
+          <div class="chart-section">
+            <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
+            <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
+          </div>
         </div>
       </div>
 
