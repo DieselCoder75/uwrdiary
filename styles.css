@@ -1708,6 +1708,19 @@ details[open] .form-extra-toggle::after {
 }
 
 
+/* ── Trendit: empty state ───────────────────────────────────── */
+.trendit-empty {
+  text-align: center;
+  padding: 4rem 1rem 2rem;
+  color: var(--text-muted);
+}
+
+.trendit-empty p {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ── Joukkue: no-team state ─────────────────────────────────── */
 .joukkue-no-team-notice {
   display: flex;
