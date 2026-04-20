@@ -927,6 +927,17 @@ function applyPerfBtnColor(btn, zoneIndex, isActive) {
   }
 }
 
+function updateCommentCounter() {
+  const textarea = el('entry-comment');
+  const counter  = el('comment-char-count');
+  const wrap     = counter?.closest('.char-counter');
+  if (!textarea || !counter || !wrap) return;
+  const len = textarea.value.length;
+  counter.textContent = len;
+  wrap.classList.toggle('near-limit', len >= 400 && len < 500);
+  wrap.classList.toggle('at-limit',   len >= 500);
+}
+
 function setPerformance(value) {
   perfValue = value;
   const container = el('perf-stars');
