@@ -199,7 +199,8 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 #header-firstname {
@@ -208,6 +209,9 @@ header h1 {
   opacity: 0.9;
   white-space: nowrap;
   letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
 }
 
 /* Help button in header — sama koko kuin avatar-nappi */
