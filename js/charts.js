@@ -98,17 +98,26 @@ function filterByPerf(entries) {
   return entries.filter(e => vertailuPerfFilter.includes(e.performance));
 }
 
-// ── Init perf filter buttons (called once per renderVertailuCharts) ──
-function initVertailuPerfFilter() {
-  const container = el('vertailu-perf-btns');
+// ── Shared perf filter UI ─────────────────────────────────────
+// Just refreshes button active-states without rebuilding the DOM
+function refreshPerfBtnStates(containerId) {
+  const container = el(containerId);
+  if (!container || container.children.length !== 5) return;
+  Array.from(container.children).forEach((btn, i) => {
+    const isActive = vertailuPerfFilter.includes(i + 1);
+    btn.classList.toggle('active', isActive);
+    applyPerfBtnColor(btn, i, isActive);
+  });
+}
+
+// Builds (or refreshes) perf-filter buttons in any container.
+// onChangeFn is called after state has been updated.
+function initPerfFilterUI(containerId, onChangeFn) {
+  const container = el(containerId);
   if (!container) return;
-  // Already built — just refresh active states
+  // Already built — just sync active states
   if (container.children.length === 5) {
-    Array.from(container.children).forEach((btn, i) => {
-      const isActive = vertailuPerfFilter.includes(i + 1);
-      btn.classList.toggle('active', isActive);
-      applyPerfBtnColor(btn, i, isActive);
-    });
+    refreshPerfBtnStates(containerId);
     return;
   }
   const labels = ['I', 'II', 'III', 'IV', 'V'];
@@ -124,17 +133,26 @@ function initVertailuPerfFilter() {
     btn.addEventListener('click', () => {
       const idx = vertailuPerfFilter.indexOf(zone);
       if (idx === -1) vertailuPerfFilter.push(zone);
-      else vertailuPerfFilter.splice(idx, 1);
-      // Clear team cache so filter change forces recompute
-      const myTeams = userProfile.teams || (userProfile.team ? [userProfile.team] : []);
-      if (myTeams.length > 0) {
-        const weeks = getLastNWeeks(12);
-        const cKey  = teamCacheKey(myTeams, weeks[0].getTime());
-        try { localStorage.removeItem('uppis_tc_' + currentUser.uid + '_' + cKey); } catch {}
-      }
-      renderVertailuCharts();
+      else            vertailuPerfFilter.splice(idx, 1);
+      onChangeFn();
     });
     container.appendChild(btn);
+  });
+}
+
+// ── Init perf filter buttons (called once per renderVertailuCharts) ──
+function initVertailuPerfFilter() {
+  initPerfFilterUI('vertailu-perf-btns', () => {
+    // Keep Omat buttons in sync
+    refreshPerfBtnStates('omat-perf-btns');
+    // Clear team cache so filter change forces recompute
+    const myTeams = userProfile.teams || (userProfile.team ? [userProfile.team] : []);
+    if (myTeams.length > 0) {
+      const weeks = getLastNWeeks(12);
+      const cKey  = teamCacheKey(myTeams, weeks[0].getTime());
+      try { localStorage.removeItem('uppis_tc_' + currentUser.uid + '_' + cKey); } catch {}
+    }
+    renderVertailuCharts();
   });
 }
 
@@ -263,9 +281,10 @@ async function renderVertailuCharts() {
         // Fetch other members' entries in parallel
         if (teamMemberUids.length > 0) {
           const cutoff = firebase.firestore.Timestamp.fromDate(weeks[0]);
+          const nowTimestamp = firebase.firestore.Timestamp.fromDate(new Date());
           await Promise.all(teamMemberUids.map(async uid => {
             const snap = await db.collection('users').doc(uid).collection('entries')
-              .where('date', '>=', cutoff).get();
+              .where('date', '>=', cutoff).where('date', '<=', nowTimestamp).limit(500).get();
             cachedTeamMemberEntries[uid] = snap.docs.map(d => {
               const data = d.data();
               return {
@@ -462,6 +481,15 @@ async function renderTrenditCharts() {
   el('trendit-charts').classList.toggle('hidden', isEmpty);
   if (isEmpty) return;
 
+  // Init perf filter UI — synced with Vertailu
+  initPerfFilterUI('omat-perf-btns', () => {
+    refreshPerfBtnStates('vertailu-perf-btns');
+    renderTrenditCharts();
+  });
+
+  // Apply perf filter (shared state with Vertailu)
+  const filteredEntries = filterByPerf(allChartEntries);
+
   // Build legend
   const legendEl = el('trendit-legend');
   legendEl.innerHTML = PERF_ROMAN.map((r, i) =>
@@ -469,7 +497,7 @@ async function renderTrenditCharts() {
   ).join('');
 
   const weeks   = getLastNWeeks(12);
-  const weekMap = groupByWeek(allChartEntries);
+  const weekMap = groupByWeek(filteredEntries);
   const labels  = weeks.map(w => w.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' }));
 
   // Stacked minutes by performance level
@@ -499,35 +527,100 @@ async function renderTrenditCharts() {
     }
   );
 
-  // Feeling average bars
+  // Feeling area chart + monthly trend line
   const feelingData = weeks.map(w => {
     const val = avgField(weekMap[w.getTime()] || [], 'feeling');
-    return val !== null ? +val.toFixed(1) : null;
+    return val !== null ? +val.toFixed(2) : null;
+  });
+
+  // 4-week trailing rolling average ≈ kuukauden liukuva keskiarvo
+  const trendData = feelingData.map((_, i) => {
+    const window = feelingData.slice(Math.max(0, i - 3), i + 1).filter(v => v !== null);
+    return window.length > 0 ? +(window.reduce((s, v) => s + v, 0) / window.length).toFixed(2) : null;
   });
 
   destroyChart('weeklyFeeling');
   chartInstances.weeklyFeeling = new Chart(
     el('chart-weekly-feeling').getContext('2d'),
     {
-      type: 'bar',
+      type: 'line',
       data: {
         labels,
-        datasets: [{
-          label: 'Fiilis',
-          data: feelingData,
-          backgroundColor: '#4f46e5',
-          borderRadius: 2,
-        }],
+        datasets: [
+          {
+            label: 'Fiilis (vko ka)',
+            data: feelingData,
+            borderColor: 'rgba(0,63,156,0.7)',
+            backgroundColor: (ctx) => {
+              const canvas = ctx.chart.ctx;
+              const gradient = canvas.createLinearGradient(0, 0, 0, ctx.chart.height);
+              gradient.addColorStop(0,   'rgba(0,63,156,0.25)');
+              gradient.addColorStop(1,   'rgba(0,63,156,0.02)');
+              return gradient;
+            },
+            fill: true,
+            tension: 0.35,
+            spanGaps: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+            order: 2,
+          },
+          {
+            label: 'Trendi (kk ka)',
+            data: trendData,
+            borderColor: 'rgba(234,88,12,0.85)',
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.4,
+            spanGaps: true,
+            pointRadius: 0,
+            borderWidth: 2.5,
+            order: 1,
+          },
+        ],
       },
       options: {
         ...chartBaseOptions,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.y;
+                if (v === null) return null;
+                const label = ctx.dataset.label;
+                const feelLabel = FEEL_LABELS[Math.round(v)];
+                return `${label}: ${v.toFixed(1)}${feelLabel ? ' – ' + feelLabel : ''}`;
+              },
+            },
+          },
+        },
         scales: {
           x: { ...chartBaseOptions.scales.x },
-          y: { ...chartBaseOptions.scales.y, min: 0, max: 5, ticks: { stepSize: 1, font: { size: 10 } } },
+          y: {
+            ...chartBaseOptions.scales.y,
+            min: 1,
+            max: 5,
+            ticks: {
+              stepSize: 1,
+              font: { size: 10 },
+              callback: v => FEEL_LABELS[v] || v,
+            },
+          },
         },
       },
     }
   );
+
+  // Feeling chart legend — placed between the two charts
+  el('feeling-legend').innerHTML = [
+    { color: 'rgba(0,63,156,0.7)',   label: 'Fiilis (vko ka)' },
+    { color: 'rgba(234,88,12,0.85)', label: 'Trendi (kk ka)' },
+  ].map(item =>
+    `<span class="legend-item"><span class="legend-swatch" style="background:${item.color}"></span>${item.label}</span>`
+  ).join('');
 }
 
 // ============================================================

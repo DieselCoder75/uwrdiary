@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // App-wide settings (e.g. custom team list)
+    match /settings/{doc} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+    }
+
+    match /users/{userId} {
+      // Owner can always read/write their own doc
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Any authenticated user can read any profile (needed for team comparison)
+      allow read: if request.auth != null;
+
+      // Admin can read/delete any user doc
+      allow delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+
+      // Admin can write myReactions and coachOf to any user doc
+      allow update: if request.auth != null
+        && request.auth.token.email == 'janne.lind@gmail.com'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['myReactions', 'coachOf']);
+
+      match /entries/{entryId} {
+        // Owner can read/write their own entries
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+
+        // Any authenticated user can read entries (needed for team comparison)
+        allow read: if request.auth != null;
+
+        // Any authenticated user may update reactionCounts (reaction toggles)
+        allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactionCounts']);
+
+        // Admin can delete any entry
+        allow delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+
+        match /reactions/{reactorId} {
+          allow read: if request.auth != null;
+          allow write, delete: if request.auth != null && request.auth.uid == reactorId;
+        }
+      }
+    }
+  }
+}

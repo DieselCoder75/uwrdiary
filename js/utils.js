@@ -80,20 +80,24 @@ function confirm(message) {
 }
 
 // ============================================================
-// DANGER CONFIRM DIALOG (requires typing "Poista")
+// DANGER CONFIRM DIALOG (requires typing a confirmation word)
+// confirmWord defaults to 'Poista'; pass e.g. 'Korjaa' for maintenance actions
 // ============================================================
-function dangerConfirm(message) {
+function dangerConfirm(message, confirmWord = 'Poista') {
   return new Promise((resolve) => {
     el('danger-dialog-msg').textContent = message;
     el('danger-confirm-input').value = '';
+    el('danger-confirm-input').placeholder = confirmWord;
+    el('danger-confirm-hint-word').textContent = confirmWord;
     el('danger-ok').disabled = true;
     show('danger-dialog');
+    setTimeout(() => el('danger-confirm-input').focus(), 100);
 
     function onInput() {
-      el('danger-ok').disabled = el('danger-confirm-input').value.trim() !== 'Poista';
+      el('danger-ok').disabled = el('danger-confirm-input').value.trim() !== confirmWord;
     }
     function onOk() {
-      if (el('danger-confirm-input').value.trim() !== 'Poista') return;
+      if (el('danger-confirm-input').value.trim() !== confirmWord) return;
       cleanup(true);
     }
     function onCancel() { cleanup(false); }

@@ -115,6 +115,7 @@ auth.onAuthStateChanged(async (user) => {
 
     // 2. Load from Firestore
     await loadProfile();
+    await loadAppSettings();
 
     // 3. New registration → show onboarding instead of app
     if (isNewRegistration && !userProfile.onboardingDone) {

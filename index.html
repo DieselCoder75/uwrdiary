@@ -5,18 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="UWR Diary">
   <meta name="theme-color" content="#003F9C">
   <link rel="manifest" href="manifest.json">
+  <!-- iOS home screen icon (Safari ignores manifest icons) -->
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=172">
+  <link rel="stylesheet" href="styles.css?v=240">
 </head>
 <body>
 
   <!-- Auth View -->
   <div id="auth-view" class="view">
     <div class="auth-container">
-      <div class="auth-logo">🤿</div><h1>UWR Diary</h1>
+      <div class="auth-logo"><img src="icon-192.png" alt="UWR Diary"></div><h1>UWR Diary</h1>
       <div class="auth-tabs">
         <button class="tab-btn active" id="login-tab">Kirjaudu</button>
         <button class="tab-btn" id="register-tab">Rekisteröidy</button>
@@ -47,76 +52,107 @@
             <img id="header-avatar" class="hidden" alt="Profiilikuva">
             <span id="header-initials"></span>
           </button>
+          <button id="admin-shortcut-btn" class="admin-shortcut-btn hidden" aria-label="Hallintapaneeli">⚙</button>
           <button id="help-btn" class="help-btn" aria-label="Käyttöohje">?</button>
         </div>
       </header>
       <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="treenit">Treenit</button>
         <button class="nav-tab" data-tab="trendit">Trendit</button>
-        <button class="nav-tab" data-tab="vertailu">Vertailu</button>
         <button class="nav-tab" data-tab="joukkue">Joukkue</button>
       </nav>
+      <!-- Sub-tabs: osa sticky headeria, näkyy vain Treenit-välilehdellä -->
+      <div class="sub-tabs" id="treenit-sub-tabs">
+        <button class="sub-tab active" data-subtab="loki">Loki</button>
+        <button class="sub-tab" data-subtab="kalenteri">Kalenteri</button>
+      </div>
+      <!-- Sub-tabs: osa sticky headeria, näkyy vain Trendit-välilehdellä -->
+      <div class="sub-tabs hidden" id="trendit-sub-tabs">
+        <button class="sub-tab active" data-subtab="omat">Omat</button>
+        <button class="sub-tab" data-subtab="vertailu">Vertailu</button>
+      </div>
+      <!-- Impersonation banner -->
+      <div id="impersonation-banner" class="impersonation-banner hidden">
+        <span id="impersonation-banner-text">Katselet käyttäjänä: <strong id="impersonation-banner-name"></strong></span>
+        <button id="impersonation-exit-btn" class="impersonation-exit-btn">✕ Lopeta</button>
+      </div>
     </div>
 
     <main>
 
-      <!-- Tab: Treenit -->
+      <!-- Tab: Treenit (sisältää Loki + Kalenteri ali-tabsit) -->
       <div id="tab-treenit" class="tab-content">
-        <div class="treenit-toolbar">
-          <span id="period-label" class="period-label"></span>
-          <button id="refresh-btn" class="refresh-btn" title="Päivitä treenit" aria-label="Päivitä">↻</button>
+
+        <!-- Ali-tab: Loki (nykyinen treenilista) -->
+        <div id="subtab-loki">
+          <div class="treenit-toolbar">
+            <span id="period-label" class="period-label"></span>
+            <button id="refresh-btn" class="refresh-btn" title="Päivitä treenit" aria-label="Päivitä">↻</button>
+          </div>
+          <div id="entries-list"></div>
+          <div id="empty-state" class="hidden">
+            <div class="empty-icon">🏅</div>
+            <p>Sinulla ei ole yhtään kirjattu treeniä.</p>
+            <p class="empty-sub">Lisää ensimmäinen harjoitus + painikkeella!</p>
+          </div>
+          <div id="load-more-wrap" class="load-more-wrap hidden">
+            <button id="load-more-btn" class="load-more-btn">Lataa aiemmat 4 viikkoa</button>
+          </div>
+          <div id="no-more-entries" class="no-more-entries hidden">Kaikki treenit ladattu</div>
         </div>
-        <div id="entries-list"></div>
-        <div id="empty-state" class="hidden">
-          <div class="empty-icon">🏅</div>
-          <p>Sinulla ei ole yhtään kirjattu treeniä.</p>
-          <p class="empty-sub">Lisää ensimmäinen harjoitus + painikkeella!</p>
+
+        <!-- Ali-tab: Kalenteri -->
+        <div id="subtab-kalenteri" class="hidden">
+          <div id="calendar-container"></div>
         </div>
-        <div id="load-more-wrap" class="load-more-wrap hidden">
-          <button id="load-more-btn" class="load-more-btn">Lataa aiemmat 4 viikkoa</button>
-        </div>
-        <div id="no-more-entries" class="no-more-entries hidden">Kaikki treenit ladattu</div>
+
       </div>
 
-      <!-- Tab: Vertailu -->
-      <div id="tab-vertailu" class="tab-content hidden">
-        <!-- Perf zone filter -->
-        <div class="vertailu-perf-filter">
-          <span class="filter-label">Tehoalue:</span>
-          <div class="perf-btns" id="vertailu-perf-btns"></div>
-        </div>
-        <!-- KPI cards -->
-        <div class="vertailu-kpi-row" id="vertailu-kpi-row"></div>
-        <!-- Legend + no-team notice -->
-        <div class="chart-legend" id="vertailu-legend"></div>
-        <div id="vertailu-no-team" class="vertailu-notice hidden">
-          👥 Lisää joukkue profiilissasi nähdäksesi joukkueen vertailun.
-        </div>
-        <!-- Chart -->
-        <div class="chart-section">
-          <p class="chart-title" id="vertailu-chart-title">Minuutit – viimeiset 12 viikkoa</p>
-          <div class="chart-wrap"><canvas id="chart-vertailu-minutes"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Tab: Trendit -->
+      <!-- Tab: Trendit (sisältää Omat + Vertailu ali-tabsit) -->
       <div id="tab-trendit" class="tab-content hidden">
-        <div id="trendit-empty" class="trendit-empty hidden">
-          <div class="empty-icon">📈</div>
-          <p>Ei vielä treenejä</p>
-          <p class="empty-sub">Kirjaa ensimmäinen harjoitus ja seuraa kehitystäsi täällä.</p>
+
+        <!-- Ali-tab: Omat -->
+        <div id="subtab-omat">
+          <div class="vertailu-perf-filter">
+            <span class="filter-label">Tehoalue:</span>
+            <div class="perf-btns" id="omat-perf-btns"></div>
+          </div>
+          <div id="trendit-empty" class="trendit-empty hidden">
+            <div class="empty-icon">📈</div>
+            <p>Ei vielä treenejä</p>
+            <p class="empty-sub">Kirjaa ensimmäinen harjoitus ja seuraa kehitystäsi täällä.</p>
+          </div>
+          <div id="trendit-charts">
+            <div class="chart-legend" id="trendit-legend"></div>
+            <div class="chart-section">
+              <p class="chart-title">Minuutit – Viikko – Viimeiset 12 viikkoa</p>
+              <div class="chart-wrap"><canvas id="chart-weekly-minutes"></canvas></div>
+            </div>
+            <div class="chart-legend" id="feeling-legend"></div>
+            <div class="chart-section">
+              <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
+              <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
+            </div>
+          </div>
         </div>
-        <div id="trendit-charts">
-          <div class="chart-legend" id="trendit-legend"></div>
-          <div class="chart-section">
-            <p class="chart-title">Minuutit – Viikko – Viimeiset 12 viikkoa</p>
-            <div class="chart-wrap"><canvas id="chart-weekly-minutes"></canvas></div>
+
+        <!-- Ali-tab: Vertailu -->
+        <div id="subtab-vertailu" class="hidden">
+          <div class="vertailu-perf-filter">
+            <span class="filter-label">Tehoalue:</span>
+            <div class="perf-btns" id="vertailu-perf-btns"></div>
+          </div>
+          <div class="vertailu-kpi-row" id="vertailu-kpi-row"></div>
+          <div class="chart-legend" id="vertailu-legend"></div>
+          <div id="vertailu-no-team" class="vertailu-notice hidden">
+            👥 Lisää joukkue profiilissasi nähdäksesi joukkueen vertailun.
           </div>
           <div class="chart-section">
-            <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
-            <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
+            <p class="chart-title" id="vertailu-chart-title">Minuutit – viimeiset 12 viikkoa</p>
+            <div class="chart-wrap"><canvas id="chart-vertailu-minutes"></canvas></div>
           </div>
         </div>
+
       </div>
 
       <!-- Tab: Joukkue -->
@@ -129,6 +165,7 @@
         </div>
         <div class="treenit-toolbar">
           <span id="joukkue-period-label" class="period-label"></span>
+          <span id="joukkue-cache-ts" class="joukkue-cache-ts" title="Datan ikä"></span>
           <button id="joukkue-refresh-btn" class="refresh-btn" title="Päivitä joukkueen treenit" aria-label="Päivitä">↻</button>
         </div>
         <div id="joukkue-feed" class="joukkue-feed"></div>
@@ -137,6 +174,140 @@
     </main>
 
     <button id="add-btn" class="fab" aria-label="Lisää harjoitus">+</button>
+  </div>
+
+  <!-- ============================================================
+       ADMIN PORTAL — full-page view with its own nav tabs
+       ============================================================ -->
+  <div id="admin-portal" class="view hidden">
+
+    <div class="app-top-bar">
+      <header>
+        <h1>Hallintapaneeli</h1>
+        <div class="header-actions">
+          <button id="admin-portal-close" class="help-btn" aria-label="Sulje hallintapaneeli">✕</button>
+        </div>
+      </header>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-admin-tab="aktiivisuus">Aktiivisuus</button>
+        <button class="nav-tab" data-admin-tab="kayttajat">Käyttäjät</button>
+        <button class="nav-tab" data-admin-tab="csv">Data</button>
+        <button class="nav-tab" data-admin-tab="yllapito">Ylläpito</button>
+      </nav>
+    </div>
+
+    <main>
+
+      <!-- Tab: Aktiivisuus -->
+      <div id="admin-tab-aktiivisuus" class="tab-content">
+        <div class="admin-section">
+          <div class="admin-csv-row" style="margin-bottom:0.5rem">
+            <select id="admin-report-team" class="admin-select" style="flex:1">
+              <option value="">Valitse joukkue…</option>
+            </select>
+            <button id="admin-report-btn" class="btn-primary" style="flex:0 0 64px;padding-left:0;padding-right:0">Lataa</button>
+          </div>
+          <div class="act-report-legend" style="margin-bottom:1rem">
+            <div class="act-legend-row">
+              <span><span class="act-legend-swatch act-week-0"></span> 0 treeniä</span>
+              <span><span class="act-legend-swatch act-week-1"></span> 1 treeni</span>
+              <span><span class="act-legend-swatch act-week-2"></span> 2 treeniä</span>
+              <span><span class="act-legend-swatch act-week-3"></span> 3+</span>
+            </div>
+            <div class="act-legend-row">
+              <span><span class="act-status act-status--active"></span> Aktiivinen</span>
+              <span><span class="act-status act-status--moderate"></span> Kohtalainen</span>
+              <span><span class="act-status act-status--inactive"></span> Ei aktiivinen</span>
+            </div>
+          </div>
+          <div id="admin-activity-report">
+            <p class="loading">Valitse joukkue ja paina Lataa.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Käyttäjät -->
+      <div id="admin-tab-kayttajat" class="tab-content hidden">
+        <div class="admin-section">
+          <div id="admin-user-list-portal">
+            <p class="loading">Ladataan käyttäjiä…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Data -->
+      <div id="admin-tab-csv" class="tab-content hidden">
+        <div class="admin-section">
+          <h3 class="admin-section-title">Joukkueen data (CSV)</h3>
+          <div class="admin-csv-row">
+            <select id="admin-csv-team-portal" class="admin-select">
+              <option value="">Valitse joukkue…</option>
+              <option value="__ALL__">Kaikki pelaajat</option>
+            </select>
+            <button id="admin-csv-team-btn-portal" class="btn-primary admin-csv-btn">Lataa CSV</button>
+          </div>
+        </div>
+        <div class="admin-section" style="margin-top:1rem;border-top:1px solid var(--border-light);padding-top:1rem;">
+          <h3 class="admin-section-title">Pelaajan CSV</h3>
+          <div id="admin-csv-player-list">
+            <p style="font-size:0.85rem;color:var(--text-muted)">Valitse ensin joukkue.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Ylläpito -->
+      <div id="admin-tab-yllapito" class="tab-content hidden">
+
+        <div class="admin-section">
+          <h3 class="admin-section-title">🏟️ Joukkueet</h3>
+          <div id="admin-teams-list"></div>
+          <div class="admin-csv-row" style="margin-top:0.75rem">
+            <input type="text" id="admin-new-team-input" class="admin-input" placeholder="Uuden joukkueen nimi" style="flex:1">
+            <button class="btn-primary admin-csv-btn" onclick="adminAddTeam()">Lisää</button>
+          </div>
+        </div>
+
+        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
+          <h3 class="admin-section-title">📅 Viikkosuunnitelma</h3>
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.85rem;">
+            Aseta joukkueen suunniteltu tehoalue kuluvalle ja tuleville viikoille.
+            Näkyy kalenterissa NMJ-jäsenille. Muokkaus sallittu vain kuluvan viikon jälkeen.
+          </p>
+          <div id="admin-week-plan-list" class="week-plan-list"></div>
+        </div>
+
+        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
+          <h3 class="admin-section-title">💾 Varmuuskopio</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Lataa kaikki tietokantadata JSON-tiedostona. Aja aina ennen migraatioita tai isoja muutoksia.
+            Sisältää käyttäjäprofiilit, harjoitukset, reaktiot ja alikollektiot.
+          </p>
+          <button id="backup-btn" class="btn-primary" style="width:100%">Lataa varmuuskopio</button>
+          <div id="backup-status" style="margin-top:0.6rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);"></div>
+        </div>
+
+        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
+          <h3 class="admin-section-title">Reaktiodatan korjaus</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Rakentaa <code>reactionByUser</code>- ja <code>reactionCounts</code>-kentät uudelleen
+            reactions-alikollektiosta (lähde totuudesta). Korjaa duplikaatit ja vääristyneet laskurit.
+          </p>
+          <button id="fix-reactions-btn" class="btn-primary" style="width:100%">Korjaa reaktiodata</button>
+          <div id="fix-reactions-log" style="margin-top:1rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
+          <h3 class="admin-section-title">Orporeaktioiden poisto</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Poistaa reaktiot joiden tekijä-UID ei vastaa yhtään nykyistä käyttäjää.
+            Korjaa myös <code>reactionCounts</code> vastaamaan jäljelle jääviä reaktioita.
+          </p>
+          <button id="purge-orphan-reactions-btn" class="btn-danger-outline" style="width:100%">Poista orporeaktiot</button>
+          <div id="purge-reactions-log" style="margin-top:1rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);max-height:300px;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+    </main>
   </div>
 
   <!-- Entry Modal -->
@@ -222,6 +393,34 @@
     </div>
   </div>
 
+  <!-- Activity Picker Bottom Sheet (mobile) -->
+  <div id="activity-sheet-backdrop" class="sheet-backdrop hidden"></div>
+  <div id="activity-sheet" class="bottom-sheet hidden" role="dialog" aria-modal="true" aria-label="Valitse aktiviteetti">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span class="sheet-title">Aktiviteetti</span>
+      <button id="close-activity-sheet" class="sheet-close" aria-label="Sulje">✕</button>
+    </div>
+    <div class="sheet-search">
+      <input type="text" id="sheet-search-input" placeholder="Hae tai kirjoita laji…" autocomplete="one-time-code" spellcheck="false" autocorrect="off" autocapitalize="none">
+    </div>
+    <ul id="sheet-list" class="sheet-list" role="listbox"></ul>
+  </div>
+
+  <!-- Zone Picker Bottom Sheet (viikkosuunnitelma) -->
+  <div id="zone-picker-backdrop" class="sheet-backdrop hidden"></div>
+  <div id="zone-picker-sheet" class="bottom-sheet hidden" role="dialog" aria-modal="true" aria-label="Valitse tehoalue">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span id="zone-picker-title" class="sheet-title">Tehoalue</span>
+      <button id="zone-picker-close" class="sheet-close" aria-label="Sulje">✕</button>
+    </div>
+    <div id="zone-picker-buttons" class="zone-picker-grid"></div>
+    <div class="zone-picker-actions">
+      <button id="zone-picker-clear" class="btn-secondary zone-picker-clear-btn hidden" onclick="clearZone()">Poista suunnitelma</button>
+    </div>
+  </div>
+
   <!-- Profile Modal -->
   <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-backdrop" id="profile-backdrop"></div>
@@ -232,19 +431,24 @@
       </div>
       <form id="profile-form" novalidate>
 
+        <div class="profile-section-label">Henkilötiedot</div>
         <div class="avatar-upload-section">
           <div class="avatar-large" id="avatar-preview-wrap">
             <img id="avatar-preview" class="hidden" alt="Profiilikuva">
             <span id="avatar-preview-initials">👤</span>
           </div>
-          <p id="profile-username-display" class="profile-username"></p>
-          <label class="avatar-upload-btn">
-            Vaihda kuva
-            <input type="file" id="avatar-file" accept="image/*" style="display:none">
-          </label>
-          <p class="avatar-hint">Suositus: neliö (1:1) · max 100 KB</p>
-          <span id="avatar-size-hint" class="avatar-size-hint"></span>
-          <button type="button" id="remove-avatar-btn" class="avatar-remove hidden">Poista kuva</button>
+          <div class="avatar-upload-info">
+            <p id="profile-username-display" class="profile-username"></p>
+            <div class="avatar-upload-actions">
+              <label class="avatar-upload-btn">
+                Vaihda kuva
+                <input type="file" id="avatar-file" accept="image/*" style="display:none">
+              </label>
+              <button type="button" id="remove-avatar-btn" class="avatar-remove hidden">Poista kuva</button>
+            </div>
+            <p class="avatar-hint">Neliö (1:1) · max 100 KB</p>
+            <span id="avatar-size-hint" class="avatar-size-hint"></span>
+          </div>
         </div>
 
         <div class="form-group">
@@ -279,8 +483,9 @@
           <p id="profile-age-display" class="perf-desc"></p>
         </div>
 
+        <div class="profile-section-label">Joukkue</div>
+
         <div class="form-group">
-          <label>Joukkue <span class="label-optional">(valinnainen, monivalinta)</span></label>
           <div class="team-checkbox-group" id="profile-team-group"></div>
         </div>
 
@@ -302,9 +507,23 @@
 
       </form>
 
-      <!-- Admin + Delete own account buttons below form -->
+      <!-- Tili-osio -->
+      <div class="profile-section-label profile-section-label--account">Tili</div>
       <div class="profile-extra-actions">
-        <button id="admin-panel-btn" class="btn-primary hidden">Hallintapaneeli</button>
+        <button id="change-password-btn" class="btn-primary">Vaihda salasana</button>
+
+        <!-- Salasananvaihto-lomake (piilotettu aluksi) -->
+        <div id="change-password-form" class="change-password-form hidden">
+          <input type="password" id="cp-current" placeholder="Nykyinen salasana" autocomplete="current-password">
+          <input type="password" id="cp-new"     placeholder="Uusi salasana (min. 6 merkkiä)" autocomplete="new-password">
+          <input type="password" id="cp-confirm" placeholder="Vahvista uusi salasana" autocomplete="new-password">
+          <p id="cp-error" class="cp-error hidden"></p>
+          <div class="cp-actions">
+            <button id="cp-save-btn"   class="btn-primary">Tallenna</button>
+            <button id="cp-cancel-btn" class="btn-secondary">Peruuta</button>
+          </div>
+        </div>
+
         <button id="logout-btn" class="btn-primary">Kirjaudu ulos</button>
         <button id="delete-own-account-btn" class="btn-danger-outline">Poista oma tili ja kaikki tiedot</button>
       </div>
@@ -335,7 +554,7 @@
         <div class="form-group">
           <label>Joukkue-näkyvyys <span class="label-hint">(voit muuttaa myöhemmin profiilista)</span></label>
           <label class="team-checkbox-item">
-            <input type="checkbox" id="ob-share-activities" checked>
+            <input type="checkbox" id="ob-share-activities" checked onchange="const c=document.getElementById('ob-share-comments');c.disabled=!this.checked;if(!this.checked)c.checked=false;c.closest('label').classList.toggle('checkbox-disabled',!this.checked)">
             <span>Näytä omat aktiviteetit joukkueen syötteessä</span>
           </label>
           <label class="team-checkbox-item">
@@ -366,42 +585,129 @@
 
         <section class="help-section">
           <h3>📋 Yleistä</h3>
-          <p>UWR Diary on urheilusukeltajien harjoituspäiväkirja. Kirjaa treenit, seuraa kehitystä ja vertaa tuloksia joukkueen kesken.</p>
+          <p>UWR Diary on uppopalloilijoiden harjoituspäiväkirja. Kirjaa treenit, seuraa kehitystäsi ja vertaile tuloksia joukkueen kesken. Sovellus toimii selaimessa sekä asennettuna kotinäytölle Android- ja iPhone-laitteille.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>🚀 Rekisteröityminen</h3>
+          <ol>
+            <li>Avaa selaimella <strong>uwrdiary.web.app</strong></li>
+            <li>Napauta <strong>Rekisteröidy</strong></li>
+            <li>Syötä sähköpostiosoite ja salasana (vähintään 6 merkkiä) ja paina <strong>Luo tili</strong></li>
+            <li>Täytä tietosi: nimi, syntymäaika ja joukkue</li>
+            <li>Laita rasti <strong>Jaa treenit joukkueelle</strong> -kohtaan, jos haluat treenisi näkyvän Joukkue-syötteessä</li>
+          </ol>
+          <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-muted);">Salasanan voi vaihtaa myöhemmin profiilissa tai palauttaa kirjautumissivun <em>Unohditko salasanan?</em> -linkistä.</p>
+        </section>
+
+        <section class="help-section">
+          <h3>📲 Asenna kotinäytölle</h3>
+          <p>Sovellus toimii kuten natiivi mobiilisovellus asennettuna kotinäytölle — ei sovelluskauppaa tarvita.</p>
+          <p><strong>🤖 Android (Chrome)</strong></p>
+          <ol>
+            <li>Avaa <strong>uwrdiary.web.app</strong> Chrome-selaimessa</li>
+            <li>Napauta <strong>⋮</strong> (kolme pistettä) oikeassa yläkulmassa</li>
+            <li>Valitse <strong>Lisää aloitusnäyttöön</strong> tai <strong>Asenna sovellus</strong></li>
+            <li>Vahvista napauttamalla <strong>Lisää</strong></li>
+          </ol>
+          <p style="margin-top:0.75rem"><strong>🍎 iPhone / iPad (Safari)</strong></p>
+          <ol>
+            <li>Avaa <strong>uwrdiary.web.app</strong> <em>Safarissa</em> — muut selaimet eivät tue asennusta</li>
+            <li>Napauta alareunan <strong>jaa-painiketta</strong> <span style="font-size:1.1em">⬆</span></li>
+            <li>Valitse <strong>Lisää Koti-valikkoon</strong> ja napauta <strong>Lisää</strong></li>
+          </ol>
+        </section>
+
+        <section class="help-section">
+          <h3>📱 Navigointi</h3>
+          <ul>
+            <li>Kolme päävälilehteä: <strong>Treenit</strong>, <strong>Trendit</strong> ja <strong>Joukkue</strong></li>
+            <li>Vaihda välilehteä napauttamalla tai <strong>pyyhkäisemällä vasemmalle / oikealle</strong></li>
+            <li><strong>Treenit</strong>-välilehdellä alavalikot <strong>Loki</strong> ja <strong>Kalenteri</strong></li>
+            <li><strong>Trendit</strong>-välilehdellä alavalikot <strong>Omat</strong> ja <strong>Vertailu</strong></li>
+          </ul>
         </section>
 
         <section class="help-section">
           <h3>➕ Harjoituksen kirjaus</h3>
           <ul>
-            <li>Paina sinistä <strong>+</strong>-nappia oikeassa alakulmassa</li>
-            <li>Valitse tai kirjoita aktiviteettityyppi</li>
-            <li>Aseta kesto minuuteissa</li>
-            <li>Valitse <strong>tehoalue</strong> (I–V) ja <strong>fiilis</strong></li>
-            <li>Matka, syke ja kommentti ovat valinnaisia</li>
+            <li>Paina sinistä <strong>+</strong>-nappia oikeassa alakulmassa (näkyy Loki-näkymässä)</li>
+            <li>Valitse laji: mobiilissa aukeaa lista pyyhkäisypaneelina, selaimessa pudotusvalikko. Voit myös kirjoittaa oman lajin.</li>
+            <li>Aseta <strong>kesto</strong> minuuteissa</li>
+            <li>Valitse <strong>tehoalue</strong> (I–V) — napit värjätään tehoalueen mukaan</li>
+            <li>Valitse <strong>fiilis</strong> harjoituksen jälkeen</li>
+            <li>Valinnaisia: matka (km), keskisyke, maksimisyke ja kommentti</li>
             <li>Tallenna painamalla <strong>Tallenna</strong></li>
+            <li>Muokkaa tai poista treeniä napauttamalla korttia listassa</li>
           </ul>
         </section>
 
         <section class="help-section">
-          <h3>📊 Vertailu-välilehti</h3>
-          <p>Näyttää oman harjoittelusi verrattuna joukkueen keskiarvoon ja huipputekijään. Valitse mittari (minuutit / sessiot) ja suodata tehoalueittain.</p>
+          <h3>⚡ Tehoalueet</h3>
+          <ul>
+            <li><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#AAAAAA;margin-right:4px;vertical-align:middle"></span><strong>I – Peruskunto</strong> — matala teho, palauttava harjoittelu</li>
+            <li><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4FC3D0;margin-right:4px;vertical-align:middle"></span><strong>II – Kestävyys</strong> — aerobinen peruskestävyys</li>
+            <li><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#7DC83A;margin-right:4px;vertical-align:middle"></span><strong>III – Maksimikestävyys</strong> — kynnysharjoittelu</li>
+            <li><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F5A623;margin-right:4px;vertical-align:middle"></span><strong>IV – Nopeuskestävyys</strong> — kova intervalli</li>
+            <li><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E84040;margin-right:4px;vertical-align:middle"></span><strong>V – Nopeus</strong> — maksimiteho, lyhyet suoritukset</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>📅 Kalenteri</h3>
+          <p>Kalenteri-alivalikko (Treenit → Kalenteri) näyttää harjoittelun kuukausittaisena ruudukkokalenterina.</p>
+          <ul>
+            <li>Päivän solu värjätään <strong>kovimman tehoalueen värin mukaan</strong> — harmaa on I, turkoosi II, vihreä III, oranssi IV, punainen V</li>
+            <li>Tämän päivän päivämäärä korostetaan kehysviivalla</li>
+            <li>Kalenteri latautuu automaattisesti lisää vieritettäessä alaspäin (enintään 2 vuotta taaksepäin)</li>
+            <li>Viikkonumero näkyy jokaisen viikon vasemmassa reunassa</li>
+          </ul>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-top:0.5rem"><strong>Naisten Maajoukkueen jäsenille:</strong> viikkosolun vieressä näkyy suunniteltu tehoalue (esim. <em>III–IV</em>). Toteutunut viikko värjätään vihreäksi ✓ jos suunnitelma toteutui, punaiseksi ✗ jos ei.</p>
         </section>
 
         <section class="help-section">
           <h3>📈 Trendit-välilehti</h3>
-          <p>Viikkokohtaiset kaaviot omasta harjoittelustasi: kesto tehoalueittain ja fiilis 12 viikon ajalta.</p>
+          <ul>
+            <li><strong>Omat</strong> — viikkokohtaiset kaaviot omasta harjoittelustasi: kesto tehoalueittain ja fiilis 12 viikon ajalta. Suodata haluamasi tehoalue napeista.</li>
+            <li><strong>Vertailu</strong> — oma harjoittelusi verrattuna joukkueen keskiarvoon. Valitse mittari (minuutit / sessiot) ja suodata tehoalueittain.</li>
+          </ul>
         </section>
 
         <section class="help-section">
           <h3>👥 Joukkue-välilehti</h3>
-          <p>Reaaliaikainen syöte joukkuekavereittesi viimeisimmistä treeneistä. Voit reagoida harjoituksiin emojireaktioilla. Joukkue valitaan profiilisivulta.</p>
+          <ul>
+            <li>Reaaliaikainen virta joukkuekavereittesi viimeisimmistä treeneistä</li>
+            <li>Jokaisen kortin vasemmassa reunassa <strong>tehoalueen väri</strong></li>
+            <li>Reagoi harjoituksiin <strong>emojireaktioilla</strong> 🔥💪👏🎉😅🥇❤️</li>
+            <li>Syöte latautuu automaattisesti lisää vieritettäessä alaspäin</li>
+            <li>Liity joukkueeseen profiilisivullasi</li>
+          </ul>
         </section>
 
         <section class="help-section">
           <h3>👤 Profiili</h3>
           <ul>
-            <li>Aseta nimimerkki, nimi ja profiilikuva</li>
-            <li>Valitse joukkue/joukkueet (monivalinta)</li>
-            <li>Hallitse näkyvyyttä: näkyykö oma treeni joukkueen syötteessä</li>
+            <li>Avaa profiili napauttamalla <strong>avataria</strong> oikeassa yläkulmassa</li>
+            <li>Aseta <strong>nimimerkki</strong>, etunimi, sukunimi ja syntymäaika</li>
+            <li>Lataa <strong>profiilikuva</strong> (näkyy joukkueen syötteessä)</li>
+            <li>Valitse <strong>joukkue tai joukkueet</strong> (monivalinta)</li>
+            <li>Hallitse näkyvyyttä: <em>Jaa aktiviteetit</em> ja <em>Jaa kommentit</em> — kommenttien jako aktivoituu vasta kun aktiviteettien jako on päällä</li>
+            <li>Salasanan vaihto löytyy profiilisivun alaosasta</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>⚙ Hallintapaneeli</h3>
+          <p>Ylläpitäjälle ja valmentajille näkyy <strong>⚙-nappi</strong> yläpalkissa avatarin vieressä. Nappi avaa hallintapaneelin.</p>
+          <p style="margin-top:0.5rem"><strong>Valmentajat</strong> näkevät hallintapaneelissa:</p>
+          <ul>
+            <li><strong>Aktiivisuus</strong> — oman joukkueen harjoitusaktiivisuus 12 viikon ajalta pelaajittain</li>
+            <li><strong>CSV</strong> — lataa koko joukkueen tai yksittäisen pelaajan harjoitusdata taulukkolaskentaan</li>
+          </ul>
+          <p style="margin-top:0.5rem"><strong>Ylläpitäjä</strong> näkee lisäksi:</p>
+          <ul>
+            <li><strong>Käyttäjät</strong> — kaikkien käyttäjien hallinta; valmentajaroolin myöntäminen joukkueittain; tilin poisto</li>
+            <li><strong>Ylläpito</strong> — joukkueiden lisäys ja poisto, tietokannan varmuuskopio, reaktiodatan korjaustyökalut</li>
           </ul>
         </section>
 
@@ -416,16 +722,50 @@
           <h3>📝 Versiohistoria</h3>
 
           <div class="history-entry">
+            <span class="history-version">v1.3</span>
+            <span class="history-date">26.4.2026</span>
+            <ul>
+              <li>Kalenteri-alivalikko Treenit-välilehteen: kuukausikalenteri tehoalueiden väreillä</li>
+              <li>Naisten Maajoukkueen jäsenille viikkosuunnitelma ja toteutuman arviointi kalenterissa</li>
+              <li>Hallintapaneelin ⚙-pikakuvake yläpalkkiin ylläpitäjälle ja valmentajille</li>
+              <li>Valmentaja-rooli: valmentaja näkee joukkueensa aktiivisuuden ja voi ladata CSV:n</li>
+              <li>Ylläpitäjä voi lisätä ja poistaa joukkueita hallintapaneelista</li>
+              <li>Ylläpitäjä voi merkitä käyttäjiä joukkueen valmentajaksi</li>
+              <li>Reaktioemoji ❤️ lisätty joukkueen syötteeseen</li>
+              <li>Aktiivisuusraportti korttimaiseksi — mahtuu kapealle näytölle</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v1.2</span>
+            <span class="history-date">21.4.2026</span>
+            <ul>
+              <li>Tehoaluesuodatin Trendit – Omat -näkymään</li>
+              <li>Tehoaluenappien reuna värjätty tehoalueen mukaan</li>
+              <li>Pyyhkäisynavigaatio välilehtien välillä</li>
+              <li>Joukkueen treenikortteihin tehoalueen väririma vasemmalle laidalle</li>
+              <li>Trendit – Omat/Vertailu -alavalikot sticky-headeriin</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v1.1</span>
+            <span class="history-date">17.4.2026</span>
+            <ul>
+              <li>Android / iPhone PWA-tuki: asennettavissa kotinäytölle</li>
+              <li>Lajivalinta mobiilissa pyyhkäisypaneelina</li>
+              <li>Trendit ja Vertailu yhdistetty yhdeksi Trendit-välilehdeksi</li>
+              <li>50 lajia lajilistaan (aiempi 24)</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
             <span class="history-version">v1.0</span>
             <span class="history-date">12.4.2026</span>
             <ul>
-              <li>CSV-raporttivientitoiminto adminpaneeliin (joukkue- ja pelaajakohtainen)</li>
               <li>Salasanan palautus kirjautumissivulle</li>
-              <li>Joukkue-välilehden tyhjätila-näkymä urheilijalle joka ei kuulu joukkueeseen</li>
-              <li>Kirjaudu ulos -napin korjaus profiilisivulla</li>
-              <li>Harjoituskortin layout uusittu: kesto ja matka samassa vertikaalisessa linjassa</li>
-              <li>Profiilisivun nappulat yhtenäistetty (sininen teema)</li>
-              <li>Joukkue-näkyvyys-checkboxien fontti yhtenäistetty</li>
+              <li>Joukkue-välilehden tyhjätila-näkymä</li>
+              <li>Harjoituskortin layout uusittu</li>
             </ul>
           </div>
 
@@ -433,9 +773,8 @@
             <span class="history-version">v0.9</span>
             <span class="history-date">11.4.2026</span>
             <ul>
-              <li>Joukkue-monivalinta profiilissa (useampi joukkue samanaikaisesti)</li>
+              <li>Joukkue-monivalinta profiilissa</li>
               <li>Reaktioemojit joukkueen treenikorteissa</li>
-              <li>Joukkueen syötteen välimuisti (45 min TTL)</li>
               <li>Harjoitusten ääretön vieritys joukkue-välilehdellä</li>
               <li>Vertailu-välilehden tehoaluesuodatin</li>
             </ul>
@@ -445,11 +784,10 @@
             <span class="history-version">v0.8</span>
             <span class="history-date">9.4.2026</span>
             <ul>
-              <li>Trendit-välilehti: matka- ja sykekaaviot</li>
+              <li>Trendit-välilehti: viikkokaaviot kestosta ja fiiliksestä</li>
               <li>Harjoituskorttiin matka, keskisyke ja maksimisyke</li>
-              <li>Profiilikuvan lataus (base64, pakkauksella)</li>
+              <li>Profiilikuvan lataus</li>
               <li>Paginointi: 4 viikon näkymä kerrallaan</li>
-              <li>Offline-välimuisti (localStorage)</li>
             </ul>
           </div>
 
@@ -460,8 +798,6 @@
               <li>Joukkue-välilehti: joukkuekaverien treenivirta</li>
               <li>Vertailu-välilehti: oma vs. joukkue -kaaviot</li>
               <li>Tehoalueet I–V ja fiilismittari harjoituksiin</li>
-              <li>Firebase-autentikaatio ja Firestore-tietokanta</li>
-              <li>Adminpaneeli käyttäjien hallintaan</li>
             </ul>
           </div>
 
@@ -504,7 +840,7 @@
   <div id="danger-dialog" class="confirm-overlay hidden">
     <div class="confirm-box danger-confirm-box">
       <p id="danger-dialog-msg" class="danger-msg"></p>
-      <p class="danger-hint">Vahvistaaksesi kirjoita <strong>Poista</strong> alle:</p>
+      <p class="danger-hint">Vahvistaaksesi kirjoita <strong id="danger-confirm-hint-word">Poista</strong> alle:</p>
       <input type="text" id="danger-confirm-input" placeholder="Poista" autocomplete="off">
       <div class="confirm-actions">
         <button id="danger-cancel" class="btn-secondary">Peruuta</button>
@@ -528,16 +864,27 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="js/config.js?v=1"></script>
-  <script src="js/state.js?v=1"></script>
-  <script src="js/cache.js?v=1"></script>
-  <script src="js/utils.js?v=1"></script>
-  <script src="js/entries.js?v=1"></script>
-  <script src="js/charts.js?v=1"></script>
-  <script src="js/profile.js?v=1"></script>
-  <script src="js/joukkue.js?v=1"></script>
-  <script src="js/admin.js?v=1"></script>
-  <script src="js/auth.js?v=1"></script>
-  <script src="js/app.js?v=1"></script>
+  <script src="js/config.js?v=9"></script>
+  <script src="js/state.js?v=3"></script>
+  <script src="js/cache.js?v=2"></script>
+  <script src="js/utils.js?v=4"></script>
+  <script src="js/entries.js?v=8"></script>
+  <script src="js/charts.js?v=6"></script>
+  <script src="js/profile.js?v=10"></script>
+  <script src="js/joukkue.js?v=9"></script>
+  <script src="js/calendar.js?v=10"></script>
+  <script src="js/admin.js?v=28"></script>
+  <script src="js/auth.js?v=3"></script>
+  <script src="js/app.js?v=10"></script>
+
+  <!-- PWA: Service Worker registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(err => console.warn('SW registration failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>

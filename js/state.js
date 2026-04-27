@@ -31,6 +31,9 @@ let hasMorePages    = true;
 let isLoginMode = true;
 let isNewRegistration = false;  // set to true only after createUserWithEmailAndPassword
 
+// Impersonation state — null = real user, object = viewing as another user
+let impersonating = null; // { uid, name, email }
+
 // joukkue feed pagination
 let joukkueFeedItems    = [];   // all sorted items
 let joukkueFeedRendered = 0;    // how many cards are currently in DOM

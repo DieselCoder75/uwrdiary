@@ -2,12 +2,18 @@
 // ENTRIES — PAGINATED REAL-TIME LIST
 // ============================================================
 
-function getUserEntries() {
-  return db.collection('users').doc(currentUser.uid).collection('entries');
-}
-
+// Always the real signed-in user (profile reads/writes)
 function getUserDoc() {
   return db.collection('users').doc(currentUser.uid);
+}
+
+// The user currently being viewed — impersonated user or real user
+function getViewDoc() {
+  return db.collection('users').doc(impersonating ? impersonating.uid : currentUser.uid);
+}
+
+function getUserEntries() {
+  return getViewDoc().collection('entries');
 }
 
 // Serialise a Firestore doc to plain JSON (Timestamps → millis)
@@ -102,21 +108,29 @@ async function fetchEntries() {
     const windowStart = firebase.firestore.Timestamp.fromDate(pageWindowStart);
     const cacheKey    = 'entries_' + pageWindowStart.getTime();
 
-    const snap       = await getUserEntries().orderBy('date', 'desc').where('date', '>=', windowStart).get();
-    const serialised = snap.docs.map(serialiseEntry);
+    // N+1 pattern: fetch the window docs + 1 extra doc to detect more pages without a separate query.
+    // We drop the lower-bound filter and cap at 501 docs; any doc below windowStart means more pages exist.
+    const PAGE_CAP = 500;
+    const snapPlus1    = await getUserEntries().orderBy('date', 'desc').limit(PAGE_CAP + 1).get();
+    const inWindowDocs = snapPlus1.docs.filter(d => {
+      const ts = d.data().date;
+      return ts && (ts.toMillis ? ts.toMillis() : 0) >= windowStart.toMillis();
+    });
+    const hasExtra = snapPlus1.docs.length > inWindowDocs.length;
+
+    const serialised = inWindowDocs.map(serialiseEntry);
     const cached     = Cache.get(currentUser.uid, cacheKey) || [];
 
     if (Cache.fingerprint(serialised) !== Cache.fingerprint(cached)) {
       Cache.set(currentUser.uid, cacheKey, serialised);
-      allEntries = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      allEntries = inWindowDocs.map(doc => ({ id: doc.id, ...doc.data() }));
       refreshActiveChart();
-      renderPage(snap.docs, olderDocs);
+      renderPage(inWindowDocs, olderDocs);
     }
 
-    // "Has more" check — only if not cached
+    // Determine hasMorePages from the extra doc — no separate query needed
     if (Cache.get(currentUser.uid, 'hasMore_' + pageWindowStart.getTime()) === null) {
-      const check = await getUserEntries().where('date', '<', windowStart).limit(1).get();
-      hasMorePages = !check.empty;
+      hasMorePages = hasExtra;
       Cache.set(currentUser.uid, 'hasMore_' + pageWindowStart.getTime(), hasMorePages);
       if (hasMorePages) show('load-more-wrap'); else hide('load-more-wrap');
     }
@@ -344,6 +358,7 @@ el('entry-modal').querySelector('.modal-backdrop').addEventListener('click', clo
 el('entry-comment').addEventListener('input', updateCommentCounter);
 
 function openModal(entryId = null, data = null) {
+  if (impersonating) return;  // read-only while viewing another user
   currentEntryId = entryId;
   el('modal-title').textContent = entryId ? 'Muokkaa treeniä' : 'Uusi Treeni';
   el('delete-entry-btn').classList.toggle('hidden', !entryId);
@@ -450,6 +465,11 @@ function highlightMatch(text, q) {
     + escapeHtml(text.slice(idx + q.length));
 }
 
+function isTouchDevice() {
+  return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+}
+
+// ── Desktop combobox ──────────────────────────────────────────
 function openCombobox() {
   const input  = el('entry-type');
   const listEl = el('entry-type-list');
@@ -464,10 +484,131 @@ function closeCombobox() {
   el('entry-type').setAttribute('aria-expanded', 'false');
 }
 
+// ── Mobile bottom sheet ───────────────────────────────────────
+function renderSheetList(query) {
+  const listEl  = el('sheet-list');
+  const q       = query.trim().toLowerCase();
+  const recent  = JSON.parse(el('entry-type-list').dataset.recent || '[]');
+  const match   = t => !q || t.toLowerCase().includes(q);
+
+  const recentFiltered = recent.filter(match);
+  const allFiltered    = ALL_TYPES.filter(t => match(t) && !recent.includes(t));
+
+  let html = '';
+
+  // Custom entry shortcut when query doesn't exactly match a known type
+  const exactMatch = [...recent, ...ALL_TYPES].some(t => t.toLowerCase() === q);
+  if (q && !exactMatch) {
+    html += `<li class="sheet-item sheet-item--custom" data-value="${escapeHtml(query.trim())}">Tallenna: <strong>${escapeHtml(query.trim())}</strong></li>`;
+  }
+
+  if (recentFiltered.length > 0) {
+    html += `<li class="combobox-group">Viimeisimmät</li>`;
+    recentFiltered.forEach(t => {
+      html += `<li class="sheet-item" data-value="${escapeHtml(t)}">${highlightMatch(t, q)}</li>`;
+    });
+  }
+  if (allFiltered.length > 0) {
+    html += `<li class="combobox-group">Kaikki lajit</li>`;
+    allFiltered.forEach(t => {
+      html += `<li class="sheet-item" data-value="${escapeHtml(t)}">${highlightMatch(t, q)}</li>`;
+    });
+  }
+  if (!html) {
+    html = `<li class="sheet-item" style="color:var(--text-soft);pointer-events:none">Ei tuloksia</li>`;
+  }
+
+  listEl.innerHTML = html;
+}
+
+function updateSheetForKeyboard() {
+  const sheet = el('activity-sheet');
+  if (!sheet || sheet.classList.contains('hidden')) return;
+  const vv = window.visualViewport;
+  if (!vv) return;
+  // Push sheet up by exactly the keyboard height
+  const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
+  sheet.style.bottom    = Math.max(0, keyboardHeight) + 'px';
+  sheet.style.maxHeight = Math.round(vv.height * 0.88) + 'px';
+}
+
+function openActivitySheet() {
+  const sheet  = el('activity-sheet');
+  const search = el('sheet-search-input');
+
+  search.value = el('entry-type').value || '';
+  renderSheetList(search.value);
+
+  el('activity-sheet-backdrop').classList.remove('hidden');
+  sheet.classList.remove('hidden');
+  sheet.style.bottom    = '';
+  sheet.style.maxHeight = '';
+
+  requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('sheet-open')));
+
+  // Track keyboard appearing / disappearing
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateSheetForKeyboard);
+    window.visualViewport.addEventListener('scroll', updateSheetForKeyboard);
+  }
+  // Note: ei automaattista fokusta — estää iOS:n credential autofill -kehotteen
+}
+
+function closeActivitySheet() {
+  const sheet = el('activity-sheet');
+  sheet.classList.remove('sheet-open');
+  sheet.style.bottom    = '';
+  sheet.style.maxHeight = '';
+
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', updateSheetForKeyboard);
+    window.visualViewport.removeEventListener('scroll', updateSheetForKeyboard);
+  }
+
+  setTimeout(() => {
+    sheet.classList.add('hidden');
+    el('activity-sheet-backdrop').classList.add('hidden');
+  }, 300);
+}
+
+function selectActivityItem(value) {
+  el('entry-type').value = value;
+  closeActivitySheet();
+}
+
+function initActivitySheet() {
+  const search = el('sheet-search-input');
+
+  search.addEventListener('input', () => renderSheetList(search.value));
+
+  el('sheet-list').addEventListener('click', (e) => {
+    const item = e.target.closest('.sheet-item');
+    if (item?.dataset.value) selectActivityItem(item.dataset.value);
+  });
+
+  el('close-activity-sheet').addEventListener('click', closeActivitySheet);
+  el('activity-sheet-backdrop').addEventListener('click', closeActivitySheet);
+}
+
+// ── Combobox init — picks desktop or mobile path ──────────────
 function initTypeCombobox() {
   const input  = el('entry-type');
   const listEl = el('entry-type-list');
 
+  if (isTouchDevice()) {
+    // Mobile: input is display-only, tapping opens sheet
+    input.setAttribute('readonly', '');
+    input.setAttribute('inputmode', 'none');
+    input.style.cursor = 'pointer';
+
+    input.addEventListener('click', () => openActivitySheet());
+    input.addEventListener('focus', () => input.blur());
+
+    initActivitySheet();
+    return;
+  }
+
+  // Desktop: full combobox
   input.addEventListener('focus', () => openCombobox());
   input.addEventListener('click', () => openCombobox());
 
@@ -476,11 +617,10 @@ function initTypeCombobox() {
     listEl.classList.add('open');
   });
 
-  // Keyboard navigation
   input.addEventListener('keydown', (e) => {
-    const items = [...listEl.querySelectorAll('.combobox-item')];
+    const items  = [...listEl.querySelectorAll('.combobox-item')];
     const active = listEl.querySelector('.combobox-item.highlighted');
-    const idx = items.indexOf(active);
+    const idx    = items.indexOf(active);
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -501,19 +641,11 @@ function initTypeCombobox() {
     }
   });
 
-  // Click on list item
   listEl.addEventListener('mousedown', (e) => {
     const item = e.target.closest('.combobox-item');
     if (item) { e.preventDefault(); input.value = item.dataset.value; closeCombobox(); }
   });
 
-  // Touch support
-  listEl.addEventListener('touchend', (e) => {
-    const item = e.target.closest('.combobox-item');
-    if (item) { e.preventDefault(); input.value = item.dataset.value; closeCombobox(); }
-  });
-
-  // Close on outside click
   document.addEventListener('click', (e) => {
     if (!el('entry-type-wrap').contains(e.target)) closeCombobox();
   });
@@ -532,17 +664,18 @@ el('show-time').addEventListener('change', (e) => {
 // ============================================================
 // Apply Polar zone color to a perf button when active
 function applyPerfBtnColor(btn, zoneIndex, isActive) {
-  const color = PERF_COLORS[zoneIndex];
+  const color       = PERF_COLORS[zoneIndex];
+  const borderColor = PERF_COLORS_BORDER[zoneIndex];
   if (isActive) {
-    btn.style.background   = color;
-    btn.style.borderColor  = color;
-    btn.style.color        = 'white';
-    btn.style.boxShadow    = `0 3px 10px ${color}66`;
+    btn.style.background  = color;
+    btn.style.borderColor = color;
+    btn.style.color       = 'white';
+    btn.style.boxShadow   = `0 3px 10px ${color}66`;
   } else {
-    btn.style.background   = '';
-    btn.style.borderColor  = '';
-    btn.style.color        = '';
-    btn.style.boxShadow    = '';
+    btn.style.background  = '';
+    btn.style.borderColor = color;
+    btn.style.color       = color;
+    btn.style.boxShadow   = '';
   }
 }
 
@@ -650,7 +783,9 @@ el('entry-form').addEventListener('submit', async (e) => {
     // Invalidate caches and re-fetch
     Cache.set(currentUser.uid, 'entries_' + pageWindowStart.getTime(), null);
     invalidateChartCache();
+    calLoadedForUid = null; // pakota kalenterin uudelleenlataus
     closeModal();
+    toast(currentEntryId ? 'Treeni päivitetty.' : 'Treeni tallennettu!', 'success');
     fetchEntries();
   } catch (err) {
     console.error(err);
@@ -668,6 +803,7 @@ el('delete-entry-btn').addEventListener('click', async () => {
     await getUserEntries().doc(currentEntryId).delete();
     Cache.set(currentUser.uid, 'entries_' + pageWindowStart.getTime(), null);
     invalidateChartCache();
+    calLoadedForUid = null; // pakota kalenterin uudelleenlataus
     closeModal();
     fetchEntries();
   } catch (err) {
