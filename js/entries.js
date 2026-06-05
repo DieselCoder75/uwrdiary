@@ -12,6 +12,12 @@ function getViewDoc() {
   return db.collection('users').doc(impersonating ? impersonating.uid : currentUser.uid);
 }
 
+// UID of the user currently being viewed — käytä KAIKISSA välimuistiavaimissa
+// jotka koskevat treenidataa, jotta impersonointi ei sekoita adminin omaa cachea.
+function viewUid() {
+  return impersonating ? impersonating.uid : currentUser.uid;
+}
+
 function getUserEntries() {
   return getViewDoc().collection('entries');
 }
@@ -28,7 +34,8 @@ function serialiseEntry(doc) {
     duration:    d.duration    || 0,
     performance: d.performance || 0,
     feeling:     d.feeling     || 0,
-    comment:     d.comment     || '',
+    comment:        d.comment        || '',
+    privateComment: d.privateComment ?? false,
     distance:       d.distance      ?? null,
     avgHr:          d.avgHr         ?? null,
     maxHr:          d.maxHr         ?? null,
@@ -48,6 +55,7 @@ function deserialiseEntry(raw) {
     performance:    raw.performance,
     feeling:        raw.feeling,
     comment:        raw.comment,
+    privateComment: raw.privateComment ?? false,
     distance:       raw.distance ?? null,
     avgHr:          raw.avgHr   ?? null,
     maxHr:          raw.maxHr   ?? null,
@@ -65,6 +73,15 @@ function weeksAgoMonday(n) {
   return d;
 }
 
+// Returns the Monday (midnight) of the week that contains the given date
+function weekMondayOf(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay() || 7;          // 1=Mon … 7=Sun
+  d.setDate(d.getDate() - (day - 1));
+  return d;
+}
+
 function loadEntries() {
   pageWindowStart = weeksAgoMonday(PAGE_WEEKS);
   olderDocs       = [];
@@ -77,7 +94,7 @@ function loadEntries() {
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
 
   const cacheKey   = 'entries_' + pageWindowStart.getTime();
-  const cachedDocs = Cache.get(currentUser.uid, cacheKey);
+  const cachedDocs = Cache.get(viewUid(), cacheKey);
 
   // ── Serve from cache instantly (zero reads) ─────────────────
   if (cachedDocs && cachedDocs.length > 0) {
@@ -85,7 +102,7 @@ function loadEntries() {
     allEntries = cachedDocs.map(raw => ({ id: raw.id, ...deserialiseEntry(raw) }));
     refreshActiveChart();
     renderPage(fakeDocs, olderDocs);
-    const cachedHasMore = Cache.get(currentUser.uid, 'hasMore_' + pageWindowStart.getTime());
+    const cachedHasMore = Cache.get(viewUid(), 'hasMore_' + pageWindowStart.getTime());
     if (cachedHasMore !== null) {
       hasMorePages = cachedHasMore;
       if (hasMorePages) show('load-more-wrap'); else hide('load-more-wrap');
@@ -119,21 +136,19 @@ async function fetchEntries() {
     const hasExtra = snapPlus1.docs.length > inWindowDocs.length;
 
     const serialised = inWindowDocs.map(serialiseEntry);
-    const cached     = Cache.get(currentUser.uid, cacheKey) || [];
+    const cached     = Cache.get(viewUid(), cacheKey) || [];
 
     if (Cache.fingerprint(serialised) !== Cache.fingerprint(cached)) {
-      Cache.set(currentUser.uid, cacheKey, serialised);
+      Cache.set(viewUid(), cacheKey, serialised);
       allEntries = inWindowDocs.map(doc => ({ id: doc.id, ...doc.data() }));
       refreshActiveChart();
       renderPage(inWindowDocs, olderDocs);
     }
 
-    // Determine hasMorePages from the extra doc — no separate query needed
-    if (Cache.get(currentUser.uid, 'hasMore_' + pageWindowStart.getTime()) === null) {
-      hasMorePages = hasExtra;
-      Cache.set(currentUser.uid, 'hasMore_' + pageWindowStart.getTime(), hasMorePages);
-      if (hasMorePages) show('load-more-wrap'); else hide('load-more-wrap');
-    }
+    // Always update hasMorePages from the fresh Firestore result (N+1 pattern gives this for free)
+    hasMorePages = hasExtra;
+    Cache.set(viewUid(), 'hasMore_' + pageWindowStart.getTime(), hasMorePages);
+    if (hasMorePages) show('load-more-wrap'); else hide('load-more-wrap');
   } catch (err) {
     console.error('fetchEntries:', err);
   } finally {
@@ -147,7 +162,9 @@ async function fetchChartEntries() {
 
   const weeks    = getLastNWeeks(12);
   const weekStart = weeks[0];
-  const lsKey    = 'uppis_ch_' + currentUser.uid;
+  // Cache-avain seuraa katseltavaa käyttäjää (impersonointi)
+  const viewUid  = impersonating ? impersonating.uid : currentUser.uid;
+  const lsKey    = 'uppis_ch_' + viewUid;
 
   // Serve from cache if fresh
   try {
@@ -176,7 +193,8 @@ async function fetchChartEntries() {
 }
 
 function invalidateChartCache() {
-  try { localStorage.removeItem('uppis_ch_' + currentUser.uid); } catch {}
+  const viewUid = impersonating ? impersonating.uid : currentUser.uid;
+  try { localStorage.removeItem('uppis_ch_' + viewUid); } catch {}
   allChartEntries = [];
 }
 
@@ -185,31 +203,43 @@ async function loadOlderPage() {
   btn.disabled = true;
   btn.textContent = 'Ladataan…';
 
-  const newWindowStart = new Date(pageWindowStart);
-  newWindowStart.setDate(newWindowStart.getDate() - PAGE_WEEKS * 7);
-
-  const from     = firebase.firestore.Timestamp.fromDate(newWindowStart);
-  const to       = firebase.firestore.Timestamp.fromDate(pageWindowStart);
-  const cacheKey = 'entries_older_' + newWindowStart.getTime();
+  // Earliest meaningful date to search back to (avoid infinite loops)
+  const MIN_DATE = new Date('2020-01-01');
 
   try {
-    // Check cache for this older window first
-    const cachedOlder = Cache.get(currentUser.uid, cacheKey);
-    let olderRaw;
+    let searchFrom  = new Date(pageWindowStart);
+    let olderRaw    = [];
+    let newWindowStart;
 
-    if (cachedOlder) {
-      olderRaw = cachedOlder;
-    } else {
-      const snap = await getUserEntries()
-        .orderBy('date', 'desc')
-        .where('date', '>=', from)
-        .where('date', '<',  to)
-        .get();
-      olderRaw = snap.docs.map(serialiseEntry);
-      Cache.set(currentUser.uid, cacheKey, olderRaw);
+    // Skip empty windows — keep going back until we find entries or hit MIN_DATE
+    while (olderRaw.length === 0 && searchFrom > MIN_DATE) {
+      newWindowStart = new Date(searchFrom);
+      newWindowStart.setDate(newWindowStart.getDate() - OLDER_PAGE_WEEKS * 7);
+
+      const from     = firebase.firestore.Timestamp.fromDate(newWindowStart);
+      const to       = firebase.firestore.Timestamp.fromDate(searchFrom);
+      const cacheKey = 'entries_older_' + newWindowStart.getTime();
+
+      const cachedOlder = Cache.get(viewUid(), cacheKey);
+      if (cachedOlder) {
+        olderRaw = cachedOlder;
+      } else {
+        const snap = await getUserEntries()
+          .orderBy('date', 'desc')
+          .where('date', '>=', from)
+          .where('date', '<',  to)
+          .get();
+        olderRaw = snap.docs.map(serialiseEntry);
+        Cache.set(viewUid(), cacheKey, olderRaw);
+      }
+
+      if (olderRaw.length === 0) {
+        searchFrom = newWindowStart; // window empty — step further back
+      }
     }
 
     if (olderRaw.length === 0) {
+      // Exhausted all windows back to MIN_DATE
       hasMorePages = false;
       hide('load-more-wrap');
       show('no-more-entries');
@@ -219,14 +249,14 @@ async function loadOlderPage() {
       pageWindowStart = newWindowStart;
 
       // Check for even older entries
-      const oldest     = firebase.firestore.Timestamp.fromDate(newWindowStart);
-      const checkSnap  = await getUserEntries().where('date', '<', oldest).limit(1).get();
-      hasMorePages     = !checkSnap.empty;
-      Cache.set(currentUser.uid, 'hasMore_' + newWindowStart.getTime(), hasMorePages);
+      const oldest    = firebase.firestore.Timestamp.fromDate(newWindowStart);
+      const checkSnap = await getUserEntries().where('date', '<', oldest).limit(1).get();
+      hasMorePages    = !checkSnap.empty;
+      Cache.set(viewUid(), 'hasMore_' + newWindowStart.getTime(), hasMorePages);
 
-      // Get live window docs from cache (already in memory via onSnapshot)
-      const liveKey    = 'entries_' + weeksAgoMonday(PAGE_WEEKS).getTime();
-      const liveRaw    = Cache.get(currentUser.uid, liveKey) || [];
+      // Get live window docs from cache
+      const liveKey      = 'entries_' + weeksAgoMonday(PAGE_WEEKS).getTime();
+      const liveRaw      = Cache.get(viewUid(), liveKey) || [];
       const liveFakeDocs = liveRaw.map(raw => ({ id: raw.id, data: () => deserialiseEntry(raw) }));
 
       allEntries = [...liveFakeDocs, ...olderDocs].map(d => ({ id: d.id, ...d.data() }));
@@ -239,7 +269,7 @@ async function loadOlderPage() {
   }
 
   btn.disabled = false;
-  btn.textContent = 'Lataa aiemmat 4 viikkoa';
+  btn.textContent = 'Lataa 2 viikkoa lisää';
 }
 
 function sortEntries(docs) {
@@ -299,10 +329,204 @@ function entryCardHtml(doc) {
     </div>`;
 }
 
+// ============================================================
+// VIIKKOYHTEENVETO-KORTTI
+// ── Tavoiterengas-helper (jaettu kuluvan + menneiden korteille) ──
+const _WSC_R    = 15; // hieman pienempi → paksumpi viiva ei kasvata ulkomittaa
+const _WSC_CIRC = +(2 * Math.PI * _WSC_R).toFixed(2);
+
+function _ringHtml(current, goal, label, isPast = false) {
+  const pct  = Math.min(current / goal, 1);
+  const done = pct >= 1;
+  if (done) {
+    return `<div class="wsc-goal-row">
+      <span class="wsc-goal-text">${current}&thinsp;/&thinsp;${goal}&thinsp;${label}</span>
+      <svg class="wsc-ring" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r="${_WSC_R}" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="20" cy="20" r="${_WSC_R}" fill="#22C55E"/>
+        <path d="M13 21l4.5 4.5 9.5-9.5" stroke="white" stroke-width="2.5"
+              fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>`;
+  }
+  // Mennyt viikko + tavoite ei täyttynyt → punainen X
+  if (isPast) {
+    return `<div class="wsc-goal-row">
+      <span class="wsc-goal-text">${current}&thinsp;/&thinsp;${goal}&thinsp;${label}</span>
+      <svg class="wsc-ring" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r="${_WSC_R}" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="20" cy="20" r="${_WSC_R}" fill="#EF4444"/>
+        <path d="M14 14 L26 26 M26 14 L14 26" stroke="white" stroke-width="2.5"
+              fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>`;
+  }
+  const offset = +((_WSC_CIRC) * (1 - pct)).toFixed(2);
+  return `<div class="wsc-goal-row">
+    <span class="wsc-goal-text">${current}&thinsp;/&thinsp;${goal}&thinsp;${label}</span>
+    <svg class="wsc-ring" viewBox="0 0 40 40">
+      <circle class="wsc-ring-bg" cx="20" cy="20" r="${_WSC_R}"/>
+      <circle class="wsc-ring-fg" cx="20" cy="20" r="${_WSC_R}"
+        stroke-dasharray="${_WSC_CIRC}" stroke-dashoffset="${offset}"
+        transform="rotate(-90 20 20)"/>
+    </svg>
+  </div>`;
+}
+
+// ============================================================
+function renderWeekSummaryCard() {
+  const card = el('week-summary-card');
+  if (!card) return;
+
+  const monday    = weeksAgoMonday(0);
+  const mondayMs  = monday.getTime();
+  const sundayMs  = mondayMs + 7 * 24 * 60 * 60 * 1000; // seuraava maanantai (exclusive)
+
+  // Tämän viikon kirjaukset (ma–su)
+  const weekEntries = allEntries.filter(e => {
+    const ms = e.date?.toMillis ? e.date.toMillis()
+             : e.date?.seconds  ? e.date.seconds * 1000
+             : 0;
+    return ms >= mondayMs && ms < sundayMs;
+  });
+
+  const count    = weekEntries.length;
+  const totalMin = weekEntries.reduce((s, e) => s + (e.duration || 0), 0);
+
+  // Tehoaluejakauma minuuteissa (indeksi 0=I … 4=V)
+  const perfMins = [0, 0, 0, 0, 0];
+  weekEntries.forEach(e => {
+    const p = e.performance;
+    if (p >= 1 && p <= 5) perfMins[p - 1] += (e.duration || 0);
+  });
+  const perfTotal = perfMins.reduce((s, m) => s + m, 0);
+
+  // Viikkonumero ja suunniteltu vyöhyke
+  // calPlannedZone palauttaa merkkijonon ('IV', 'I–II' jne.) tai null
+  const { week } = calIsoWeekData(monday);
+  const zone     = typeof calPlannedZone === 'function' ? calPlannedZone(monday) : null;
+  const _zoneNum  = zone ? Math.max(...parseZoneStr(zone)) : 0;
+  const _zoneName = _zoneNum ? PERF_LABELS[_zoneNum].split(' – ')[1] : '';
+  const weekLabel = zone
+    ? (_zoneName ? `${_zoneName} · ${zone} · vk ${week}` : `${zone} · vk ${week}`)
+    : `vk ${week}`;
+
+  // Palkki ja labelit
+  let barHtml   = '';
+  let labelHtml = '';
+  if (perfTotal > 0) {
+    perfMins.forEach((mins, i) => {
+      if (!mins) return;
+      barHtml += `<div class="wsc-bar-seg" style="flex:${mins / perfTotal};background:${PERF_COLORS[i]}"></div>`;
+    });
+    perfMins.forEach((mins, i) => {
+      if (!mins) return;
+      const pct = Math.round(mins / perfTotal * 100);
+      labelHtml += `<span class="wsc-label">
+        <span class="wsc-label-dot" style="background:${PERF_COLORS[i]}"></span>
+        ${['I','II','III','IV','V'][i]}&thinsp;${pct}%
+      </span>`;
+    });
+  }
+
+  // ── Tavoiterenkaat ──────────────────────────────────────────
+  const minGoal  = userProfile?.weeklyMinutesGoal  || null;
+  const sessGoal = userProfile?.weeklySessionsGoal || null;
+
+  const goalsHtml = (minGoal || sessGoal) ? `
+    <div class="wsc-goals">
+      ${minGoal  ? _ringHtml(totalMin, minGoal,  'min') : ''}
+      ${sessGoal ? _ringHtml(count,    sessGoal, 'krt') : ''}
+    </div>` : '';
+
+  const _zoneTag = zone
+    ? `<span class="wsc-zone-inline">${escapeHtml(zone)}${_zoneName ? ` – ${escapeHtml(_zoneName)}` : ''}</span>`
+    : '<span></span>';
+
+  card.innerHTML = `
+    <div class="wsc-grid">
+      <span class="wsc-week">KULUVA VIIKKO</span>
+      ${_zoneTag}
+      <div class="wsc-count-row">
+        <span class="wsc-big">${count}</span>
+        <span class="wsc-meta">${count === 1 ? 'treeni' : 'treeniä'}&thinsp;·&thinsp;${totalMin}&thinsp;min</span>
+      </div>
+      ${goalsHtml || '<span></span>'}
+    </div>
+    ${perfTotal > 0 ? `
+    <div class="wsc-bar-wrap">${barHtml}</div>
+    <div class="wsc-labels">${labelHtml}</div>` : ''}
+  `;
+  card.classList.remove('hidden');
+}
+
+// Generates a past-week summary card HTML (inserted inline in the entries list)
+function pastWeekSummaryHtml(docs, monday) {
+  const entries  = docs.map(d => d.data());
+  const count    = entries.length;
+  const totalMin = entries.reduce((s, e) => s + (e.duration || 0), 0);
+
+  const perfMins = [0, 0, 0, 0, 0];
+  entries.forEach(e => {
+    const p = e.performance;
+    if (p >= 1 && p <= 5) perfMins[p - 1] += (e.duration || 0);
+  });
+  const perfTotal = perfMins.reduce((s, m) => s + m, 0);
+
+  const { week, year } = (typeof calIsoWeekData === 'function') ? calIsoWeekData(monday) : { week: '?', year: monday.getFullYear() };
+  const thisYear = new Date().getFullYear();
+  const yearSuffix = year !== thisYear ? ` ${year}` : '';
+  const zone = (typeof calPlannedZone === 'function') ? calPlannedZone(monday) : null;
+  const _pZoneNum  = zone ? Math.max(...parseZoneStr(zone)) : 0;
+  const _pZoneName = _pZoneNum ? PERF_LABELS[_pZoneNum].split(' – ')[1] : '';
+  const rightLabel = zone
+    ? (_pZoneName ? `${_pZoneName} · ${zone} · vk ${week}${yearSuffix}` : `${zone} · vk ${week}${yearSuffix}`)
+    : `vk ${week}${yearSuffix}`;
+
+  let barHtml = '', labelHtml = '';
+  if (perfTotal > 0) {
+    perfMins.forEach((mins, i) => {
+      if (!mins) return;
+      barHtml   += `<div class="wsc-bar-seg" style="flex:${mins / perfTotal};background:${PERF_COLORS[i]}"></div>`;
+    });
+    perfMins.forEach((mins, i) => {
+      if (!mins) return;
+      const pct = Math.round(mins / perfTotal * 100);
+      labelHtml += `<span class="wsc-label"><span class="wsc-label-dot" style="background:${PERF_COLORS[i]}"></span>${['I','II','III','IV','V'][i]}&thinsp;${pct}%</span>`;
+    });
+  }
+
+  const _pZoneTag = _pZoneNum
+    ? `<span class="wsc-zone-inline">${escapeHtml(zone)}${_pZoneName ? ` – ${escapeHtml(_pZoneName)}` : ''}</span>`
+    : '<span></span>';
+
+  const _pMg = userProfile?.weeklyMinutesGoal  || null;
+  const _pSg = userProfile?.weeklySessionsGoal || null;
+  const _pGoalsHtml = (_pMg || _pSg) ? `<div class="wsc-goals">
+    ${_pMg ? _ringHtml(totalMin, _pMg, 'min', true) : ''}
+    ${_pSg ? _ringHtml(count,    _pSg, 'krt', true) : ''}
+  </div>` : '';
+
+  return `<div class="week-summary-card week-summary-card--past">
+    <div class="wsc-grid">
+      <span class="wsc-week">VK ${week}${yearSuffix}</span>
+      ${_pZoneTag}
+      <div class="wsc-count-row">
+        <span class="wsc-big">${count}</span>
+        <span class="wsc-meta">${count === 1 ? 'treeni' : 'treeniä'}&thinsp;·&thinsp;${totalMin}&thinsp;min</span>
+      </div>
+      ${_pGoalsHtml || '<span></span>'}
+    </div>
+    ${perfTotal > 0 ? `<div class="wsc-bar-wrap">${barHtml}</div><div class="wsc-labels">${labelHtml}</div>` : ''}
+  </div>`;
+}
+
 function renderPage(liveDocs, extraDocs) {
   const list  = el('entries-list');
   const empty = el('empty-state');
   const allDocs = sortEntries([...liveDocs, ...extraDocs]);
+
+  renderWeekSummaryCard();
 
   if (allDocs.length === 0) {
     list.innerHTML = '';
@@ -313,7 +537,28 @@ function renderPage(liveDocs, extraDocs) {
   }
 
   empty.classList.add('hidden');
-  list.innerHTML = allDocs.map(entryCardHtml).join('');
+
+  // Group entries by week, insert past-week summary cards at week boundaries
+  const thisWeekMs = weeksAgoMonday(0).getTime();
+  const weekGroups = new Map(); // weekMondayMs -> { monday, docs[] }
+  allDocs.forEach(doc => {
+    const ts  = doc.data().date;
+    const ms  = ts?.toMillis ? ts.toMillis() : ts?.seconds ? ts.seconds * 1000 : 0;
+    const mon = weekMondayOf(new Date(ms));
+    const key = mon.getTime();
+    if (!weekGroups.has(key)) weekGroups.set(key, { monday: mon, docs: [] });
+    weekGroups.get(key).docs.push(doc);
+  });
+  const sortedWeeks = [...weekGroups.entries()].sort((a, b) => b[0] - a[0]);
+
+  let html = '';
+  sortedWeeks.forEach(([weekMs, { monday, docs }]) => {
+    if (weekMs < thisWeekMs) {
+      html += pastWeekSummaryHtml(docs, monday);
+    }
+    html += docs.map(entryCardHtml).join('');
+  });
+  list.innerHTML = html;
   showOwnEntryReactions(allDocs); // reads from cached reactionCounts — zero Firestore reads
 
   // Period label
@@ -352,7 +597,7 @@ function showOwnEntryReactions(allDocs) {
 // ============================================================
 // MODAL — OPEN / CLOSE
 // ============================================================
-el('add-btn').addEventListener('click', () => openModal());
+el('add-btn').addEventListener('click', () => { haptic('light'); openModal(); });
 el('close-modal').addEventListener('click', closeModal);
 el('entry-modal').querySelector('.modal-backdrop').addEventListener('click', closeModal);
 el('entry-comment').addEventListener('input', updateCommentCounter);
@@ -360,11 +605,18 @@ el('entry-comment').addEventListener('input', updateCommentCounter);
 function openModal(entryId = null, data = null) {
   if (impersonating) return;  // read-only while viewing another user
   currentEntryId = entryId;
+  // Säilytä alkuperäinen data jotta records-päivitys osaa laskea deltan editissä
+  originalEntryData = entryId && data ? {
+    date: data.date,
+    duration: data.duration,
+    type: data.type,
+  } : null;
   el('modal-title').textContent = entryId ? 'Muokkaa treeniä' : 'Uusi Treeni';
   el('delete-entry-btn').classList.toggle('hidden', !entryId);
 
   // Date — cap at today so future dates cannot be selected
-  const today = new Date().toISOString().split('T')[0];
+  // Use local time (not toISOString which is UTC — would be wrong date in Finland late at night)
+  const today = timestampToDateStr(new Date());
   el('entry-date').max = today;
   el('entry-date').value = data?.date ? timestampToDateStr(data.date) : today;
 
@@ -379,7 +631,11 @@ function openModal(entryId = null, data = null) {
 
   // Other fields
   el('entry-duration').value  = data?.duration || 60;
-  el('entry-comment').value   = data?.comment  || '';
+  el('entry-comment').value           = data?.comment        || '';
+  el('entry-private-comment').checked  = data?.privateComment ?? false;
+  // Näytä "Yksityinen"-checkbox vain jos käyttäjä jakaa kommentit fiidissä
+  const showPrivate = userProfile.shareActivities && userProfile.shareComments;
+  el('entry-private-comment').closest('.toggle-label').classList.toggle('hidden', !showPrivate);
   updateCommentCounter();
   el('entry-distance').value  = data?.distance != null ? String(data.distance).replace('.', ',') : '';
   el('entry-heartrate').value = data?.avgHr    != null ? data.avgHr    : '';
@@ -741,8 +997,8 @@ el('entry-form').addEventListener('submit', async (e) => {
 
   if (!dateVal) { toast('Valitse päivämäärä.', 'error'); return; }
 
-  // Prevent future dates (same day is OK regardless of time)
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Prevent future dates (same day is OK regardless of time) — local time, not UTC
+  const todayStr = timestampToDateStr(new Date());
   if (dateVal > todayStr) { toast('Et voi lisätä treeniä tulevaisuuteen.', 'error'); return; }
 
   const dateObj = timeVal
@@ -759,6 +1015,12 @@ el('entry-form').addEventListener('submit', async (e) => {
   const hrRaw    = parseInt(el('entry-heartrate').value, 10);
   const maxHrRaw = parseInt(el('entry-maxhr').value, 10);
 
+  // Estä tuplatallennus — disabloi nappi heti kun validointi on mennyt läpi
+  const saveBtn = el('entry-save-btn');
+  if (saveBtn?.disabled) return; // jo käynnissä
+  const _saveBtnText = saveBtn?.textContent || 'Tallenna';
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Tallennetaan…'; }
+
   const data = {
     date:        firebase.firestore.Timestamp.fromDate(dateObj),
     hasTime:     !!timeVal,
@@ -766,7 +1028,8 @@ el('entry-form').addEventListener('submit', async (e) => {
     duration,
     performance: perfValue,
     feeling:     feelValue,
-    comment:     el('entry-comment').value.trim(),
+    comment:        el('entry-comment').value.trim(),
+    privateComment: el('entry-private-comment').checked,
     distance:    isNaN(distRaw)  ? null : distRaw,
     avgHr:       isNaN(hrRaw)    ? null : hrRaw,
     maxHr:       isNaN(maxHrRaw) ? null : maxHrRaw,
@@ -774,22 +1037,67 @@ el('entry-form').addEventListener('submit', async (e) => {
   };
 
   try {
+    // Records-päivitys (vain jos käyttäjä on bootstrapattu)
+    const recordsUpdate = recordsReady()
+      ? await buildRecordsUpdate(
+          currentEntryId ? 'edit' : 'add',
+          originalEntryData, // null jos uusi
+          data
+        )
+      : null;
+
     if (currentEntryId) {
-      await getUserEntries().doc(currentEntryId).update(data);
+      // EDIT: yritä batch jos records-päivitys mukana
+      if (recordsUpdate && Object.keys(recordsUpdate).filter(k => !k.startsWith('_')).length) {
+        const batch = db.batch();
+        batch.update(getUserEntries().doc(currentEntryId), data);
+        const cleanUpdates = Object.fromEntries(Object.entries(recordsUpdate).filter(([k]) => !k.startsWith('_')));
+        batch.update(getUserDoc(), cleanUpdates);
+        await batch.commit();
+      } else {
+        await getUserEntries().doc(currentEntryId).update(data);
+      }
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      await getUserEntries().add(data);
+      if (recordsUpdate && Object.keys(recordsUpdate).filter(k => !k.startsWith('_')).length) {
+        const batch = db.batch();
+        const newRef = getUserEntries().doc();
+        batch.set(newRef, data);
+        const cleanUpdates = Object.fromEntries(Object.entries(recordsUpdate).filter(([k]) => !k.startsWith('_')));
+        batch.update(getUserDoc(), cleanUpdates);
+        await batch.commit();
+      } else {
+        await getUserEntries().add(data);
+      }
     }
+
+    // Synkkaa profile-cache (records muuttui paikallisesti)
+    if (recordsUpdate) syncRecordsCache();
+
     // Invalidate caches and re-fetch
-    Cache.set(currentUser.uid, 'entries_' + pageWindowStart.getTime(), null);
+    Cache.set(viewUid(), 'entries_' + pageWindowStart.getTime(), null);
+    Cache.set(viewUid(), 'hasMore_' + pageWindowStart.getTime(), null); // pakota uudelleentarkistus
     invalidateChartCache();
-    calLoadedForUid = null; // pakota kalenterin uudelleenlataus
+    invalidateCalendarCache();
+    // Vain ei-bootstrappatuille tarvitsee invalidoida ennätys-HTML-cache
+    if (!recordsReady()) invalidateEnnatykset();
+    else ennatyksetLoaded = false; // pakota re-render fast-pathilla
     closeModal();
-    toast(currentEntryId ? 'Treeni päivitetty.' : 'Treeni tallennettu!', 'success');
+    haptic('success');
+    if (!navigator.onLine && !currentEntryId) {
+      const cur = parseInt(localStorage.getItem('uppis_pending_count') || '0', 10);
+      localStorage.setItem('uppis_pending_count', String(cur + 1));
+      toast('📵 Treenikirjaus tallennettu jonoon', 'success');
+    } else {
+      toast(currentEntryId ? 'Treeni päivitetty.' : 'Treeni tallennettu!', 'success');
+    }
     fetchEntries();
   } catch (err) {
     console.error(err);
+    haptic('error');
     toast('Tallennus epäonnistui. Yritä uudelleen.', 'error');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = _saveBtnText; }
   }
 });
 
@@ -799,16 +1107,46 @@ el('entry-form').addEventListener('submit', async (e) => {
 el('delete-entry-btn').addEventListener('click', async () => {
   const yes = await confirm('Poistetaanko tämä harjoitus? Toimintoa ei voi peruuttaa.');
   if (!yes) return;
+  // Estä tuplaklikkaus poistossa
+  const delBtn = el('delete-entry-btn');
+  if (delBtn?.disabled) return;
+  if (delBtn) { delBtn.disabled = true; delBtn.textContent = 'Poistetaan…'; }
   try {
-    await getUserEntries().doc(currentEntryId).delete();
-    Cache.set(currentUser.uid, 'entries_' + pageWindowStart.getTime(), null);
+    const recordsUpdate = recordsReady() && originalEntryData
+      ? await buildRecordsUpdate('remove', originalEntryData, null)
+      : null;
+
+    if (recordsUpdate && Object.keys(recordsUpdate).filter(k => !k.startsWith('_')).length) {
+      const batch = db.batch();
+      batch.delete(getUserEntries().doc(currentEntryId));
+      const cleanUpdates = Object.fromEntries(Object.entries(recordsUpdate).filter(([k]) => !k.startsWith('_')));
+      batch.update(getUserDoc(), cleanUpdates);
+      await batch.commit();
+    } else {
+      await getUserEntries().doc(currentEntryId).delete();
+    }
+
+    // Jos pisin tai ensimmäinen entry poistettiin → rescan (1-2 readia, harvinainen)
+    if (recordsUpdate && (recordsUpdate._needsLongestRescan || recordsUpdate._needsFirstRescan)) {
+      try { await rescanLongestAndFirst(); } catch (e) { console.warn('rescan failed:', e); }
+    }
+    if (recordsUpdate) syncRecordsCache();
+
+    Cache.set(viewUid(), 'entries_' + pageWindowStart.getTime(), null);
+    Cache.set(viewUid(), 'hasMore_' + pageWindowStart.getTime(), null); // pakota uudelleentarkistus
     invalidateChartCache();
-    calLoadedForUid = null; // pakota kalenterin uudelleenlataus
+    invalidateCalendarCache();
+    if (!recordsReady()) invalidateEnnatykset();
+    else ennatyksetLoaded = false;
+    haptic('medium');
     closeModal();
     fetchEntries();
   } catch (err) {
     console.error(err);
+    haptic('error');
     toast('Poisto epäonnistui.', 'error');
+  } finally {
+    if (delBtn) { delBtn.disabled = false; delBtn.textContent = 'Poista'; }
   }
 });
 

@@ -1,6 +1,12 @@
 // ============================================================
 // NAV TABS
 // ============================================================
+const TAB_TITLES = { treenit: 'Treenit', trendit: 'Trendit', joukkue: 'Joukkue' };
+
+function setHeaderTabTitle(tab) {
+  const t = el('header-tab-title');
+  if (t) t.textContent = TAB_TITLES[tab] || tab;
+}
 // Lock window scroll when Trendit content fits in viewport; unlock otherwise
 function updateTrenditScroll() {
   const activeTab = document.querySelector('#app-view .nav-tab.active')?.dataset.tab;
@@ -26,11 +32,13 @@ document.querySelectorAll('#app-view .nav-tab').forEach(btn => {
     // Sub-tabs: näytä oikea setti per välilehti
     el('treenit-sub-tabs').classList.toggle('hidden', tab !== 'treenit');
     el('trendit-sub-tabs').classList.toggle('hidden', tab !== 'trendit');
+    el('joukkue-sub-tabs').classList.toggle('hidden', tab !== 'joukkue');
 
-    // FAB: näkyvissä Treenit/Loki -välilehdellä (ei impersonoinnin aikana)
+    // FAB: näkyvissä vain Treenit/Loki -välilehdellä (ei impersonoinnin aikana)
     if (tab === 'treenit') {
       const activeSub = document.querySelector('#treenit-sub-tabs .sub-tab.active')?.dataset.subtab || 'loki';
-      el('add-btn').classList.toggle('hidden', activeSub === 'kalenteri' || !!impersonating);
+      el('add-btn').classList.toggle('hidden', activeSub !== 'loki' || !!impersonating);
+      if (activeSub === 'aicoach') renderAiCoachTab();
     } else {
       el('add-btn').classList.add('hidden');
     }
@@ -39,8 +47,10 @@ document.querySelectorAll('#app-view .nav-tab').forEach(btn => {
       const activeSub = document.querySelector('#trendit-sub-tabs .sub-tab.active')?.dataset.subtab || 'omat';
       if (activeSub === 'omat')     renderTrenditCharts();
       if (activeSub === 'vertailu') renderVertailuCharts();
+      if (activeSub === 'kuorma')   renderKuormaTab();
     }
     if (tab === 'joukkue') renderJoukkueTab();
+    setHeaderTabTitle(tab);
     updateTrenditScroll();
   });
 });
@@ -53,19 +63,30 @@ document.querySelectorAll('.sub-tab').forEach(btn => {
     // Deaktivoi vain saman containerin sub-tabsit
     btn.closest('.sub-tabs').querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    const sub      = btn.dataset.subtab;
-    const isTreeni = !!btn.closest('#treenit-sub-tabs');
+    const sub       = btn.dataset.subtab;
+    const isTreeni  = !!btn.closest('#treenit-sub-tabs');
+    const isJoukkue = !!btn.closest('#joukkue-sub-tabs');
 
     if (isTreeni) {
       el('subtab-loki').classList.toggle('hidden', sub !== 'loki');
       el('subtab-kalenteri').classList.toggle('hidden', sub !== 'kalenteri');
+      el('subtab-aicoach').classList.toggle('hidden', sub !== 'aicoach');
       el('add-btn').classList.toggle('hidden', sub !== 'loki' || !!impersonating);
       if (sub === 'kalenteri') renderCalendarTab();
+      if (sub === 'aicoach')   renderAiCoachTab();
+    } else if (isJoukkue) {
+      el('subtab-fiidi').classList.toggle('hidden', sub !== 'fiidi');
+      el('subtab-tapahtumat').classList.toggle('hidden', sub !== 'tapahtumat');
+      el('subtab-viikkoohje').classList.toggle('hidden', sub !== 'viikkoohje');
+      if (sub === 'tapahtumat') renderTapahtumatTab();
+      if (sub === 'viikkoohje') renderViikkoOhjeTab();
     } else {
       el('subtab-omat').classList.toggle('hidden', sub !== 'omat');
       el('subtab-vertailu').classList.toggle('hidden', sub !== 'vertailu');
+      el('subtab-kuorma').classList.toggle('hidden', sub !== 'kuorma');
       if (sub === 'omat')     renderTrenditCharts();
       if (sub === 'vertailu') renderVertailuCharts();
+      if (sub === 'kuorma')   renderKuormaTab();
       updateTrenditScroll();
     }
   });
@@ -86,18 +107,55 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ============================================================
-// SWIPE NAVIGATION — swipe left/right to switch main tabs
+// SWIPE NAVIGATION — sivujärjestys: Loki→Kalenteri→Omat→Vertailu→Kuorma→Fiidi→Tapahtumat
 // ============================================================
-const MAIN_TABS = ['treenit', 'trendit', 'joukkue'];
+const PAGES = [
+  { tab: 'treenit', sub: 'loki' },
+  { tab: 'treenit', sub: 'kalenteri' },
+  { tab: 'treenit', sub: 'aicoach' },
+  { tab: 'trendit', sub: 'omat' },
+  { tab: 'trendit', sub: 'vertailu' },
+  { tab: 'trendit', sub: 'kuorma' },
+  { tab: 'joukkue', sub: 'fiidi' },
+  { tab: 'joukkue', sub: 'viikkoohje' },
+  { tab: 'joukkue', sub: 'tapahtumat' },
+];
 
-function getActiveTabIndex() {
-  const active = document.querySelector('#app-view .nav-tab.active');
-  return active ? MAIN_TABS.indexOf(active.dataset.tab) : 0;
+// Onko sivun ali-tab-nappi piilotettu (esim. admin-only AI Coach muilta)?
+function pageBtnHidden(page) {
+  const btn = document.querySelector(`#${page.tab}-sub-tabs [data-subtab="${page.sub}"]`);
+  return !btn || btn.classList.contains('hidden');
 }
 
-function activateTabByIndex(index) {
-  const btn = document.querySelector(`#app-view [data-tab="${MAIN_TABS[index]}"]`);
-  if (btn) btn.click();
+// Seuraava NÄKYVÄ sivu suuntaan dir (+1 / -1), tai -1 jos ei löydy
+function nextVisiblePageIndex(current, dir) {
+  for (let i = current + dir; i >= 0 && i < PAGES.length; i += dir) {
+    if (!pageBtnHidden(PAGES[i])) return i;
+  }
+  return -1;
+}
+
+// Takaisinyhteensopivuus (käytetään muualla)
+const MAIN_TABS = ['treenit', 'trendit', 'joukkue'];
+
+function getActivePageIndex() {
+  const activeTab = document.querySelector('#app-view .nav-tab.active')?.dataset.tab || 'treenit';
+  const subTabsId = activeTab + '-sub-tabs';
+  const activeSub = document.querySelector(`#${subTabsId} .sub-tab.active`)?.dataset.subtab || '';
+  const idx = PAGES.findIndex(p => p.tab === activeTab && p.sub === activeSub);
+  return idx >= 0 ? idx : PAGES.findIndex(p => p.tab === activeTab);
+}
+
+function activatePageByIndex(index) {
+  const page = PAGES[index];
+  if (!page) return;
+  const currentTab = document.querySelector('#app-view .nav-tab.active')?.dataset.tab;
+  if (currentTab !== page.tab) {
+    const tabBtn = document.querySelector(`#app-view [data-tab="${page.tab}"]`);
+    if (tabBtn) tabBtn.click();
+  }
+  const subBtn = document.querySelector(`#${page.tab}-sub-tabs [data-subtab="${page.sub}"]`);
+  if (subBtn) subBtn.click();
 }
 
 (function initSwipe() {
@@ -111,7 +169,6 @@ function activateTabByIndex(index) {
   }, { passive: true });
 
   main.addEventListener('touchmove', e => {
-    // Mark as moved so we can detect scroll vs swipe
     moved = true;
   }, { passive: true });
 
@@ -123,9 +180,9 @@ function activateTabByIndex(index) {
     // Must be primarily horizontal (2:1 ratio) and at least 55 px
     if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 2) return;
 
-    const current = getActiveTabIndex();
-    if (dx < 0 && current < MAIN_TABS.length - 1) activateTabByIndex(current + 1); // ← vasen
-    if (dx > 0 && current > 0)                     activateTabByIndex(current - 1); // → oikea
+    const current = getActivePageIndex();
+    const target  = nextVisiblePageIndex(current, dx < 0 ? 1 : -1);
+    if (target >= 0) activatePageByIndex(target);
   }, { passive: true });
 })();
 
@@ -150,6 +207,8 @@ window.addEventListener('scroll', async () => {
   }
 
   if (activeTab === 'joukkue') {
+    const activeSub = document.querySelector('#joukkue-sub-tabs .sub-tab.active')?.dataset.subtab || 'fiidi';
+    if (activeSub !== 'fiidi') return;
     if (joukkueLoadingPage) return;
     if (joukkueFeedRendered >= joukkueFeedItems.length) return;
     if (distFromBottom < 180) {
@@ -159,3 +218,36 @@ window.addEventListener('scroll', async () => {
     }
   }
 }, { passive: true });
+
+// ============================================================
+// OFFLINE / ONLINE -tilanhallinta
+// ============================================================
+const PENDING_KEY = 'uppis_pending_count';
+
+function getPendingCount() {
+  return parseInt(localStorage.getItem(PENDING_KEY) || '0', 10);
+}
+function setPendingCount(n) {
+  if (n <= 0) localStorage.removeItem(PENDING_KEY);
+  else localStorage.setItem(PENDING_KEY, String(n));
+}
+
+function updateOfflineBanner(isOffline) {
+  el('offline-banner')?.classList.toggle('hidden', !isOffline);
+}
+
+window.addEventListener('offline', () => {
+  updateOfflineBanner(true);
+});
+
+window.addEventListener('online', () => {
+  updateOfflineBanner(false);
+  const count = getPendingCount();
+  if (count > 0) {
+    toast(`✅ Yhteys palautettu — ${count} ${count === 1 ? 'treenikirjaus' : 'treenikirjausta'} synkattu`, 'success');
+    setPendingCount(0);
+  }
+});
+
+// Tarkista tila heti käynnistyksessä
+updateOfflineBanner(!navigator.onLine);

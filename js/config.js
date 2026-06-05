@@ -14,11 +14,26 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
+// Offline persistence — kirjaukset jonottuvat automaattisesti
+db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+  if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+    console.warn('Persistence:', err);
+  }
+});
+
 // ============================================================
 // CONSTANTS
 // ============================================================
 const ADMIN_EMAIL  = 'janne.lind@gmail.com';
-const PAGE_WEEKS   = 4;
+// AI Coach: oletuksena PÄÄLLÄ näillä käyttäjillä (jos täppää ei ole erikseen
+// asetettu profiilissa). Muilla oletuksena pois — käyttäjä voi laittaa päälle itse.
+const AICOACH_DEFAULT_ON_EMAILS = [
+  'janne.lind@gmail.com',
+  'nuppu.rytioja@gmail.com',
+  'paula.aittooja@gmail.com',
+];
+const PAGE_WEEKS        = 4;   // initial window (current + 3 prev weeks)
+const OLDER_PAGE_WEEKS  = 2;   // step size when loading older entries
 const CHART_CACHE_TTL   = 60 * 60 * 1000;   // 1 h
 const JOUKKUE_CACHE_TTL = 45 * 60 * 1000;   // 45 min
 const TEAM_CACHE_TTL    = 60 * 60 * 1000;   // 1 h
@@ -49,12 +64,51 @@ const ALL_TYPES = [
   'Kuntosali', 'Kävely', 'Laskettelu', 'Lentopallo', 'Liikkuvuus',
   'Lumilautailu', 'Luistelu', 'Maastopyöräily', 'Melonta', 'Padel', 'Pesäpallo',
   'Pilates', 'Porrastreeni', 'Pyöräily', 'Ryhmäliikunta', 'Salibandy', 'Snorklaus',
-  'Soutu', 'Spinning', 'Squash', 'SUP-lautailu', 'Suunnistus', 'Sähly',
+  'Rullaluistelu', 'Soutu', 'Spinning', 'Squash', 'SUP-lautailu', 'Suunnistus', 'Sähly',
   'Tanssi', 'Tennis', 'Ultimate', 'Uinti', 'Uppopallo', 'Vaellus',
   'Vapaasukellus', 'Vesijuoksu', 'Vesijumppa', 'Voimaharjoittelu',
+  'Kajakointi', 'Sauvakävely', 'Surffaus',
 ];
 
 const JOUKKUE_PAGE_SIZE = 20;
+
+// ============================================================
+// EWMA TRAINING LOAD — tehoaluepainot + lajikertoimet
+// ============================================================
+// Tehoalueen kuormituspaino (indeksi = performance-arvo 0–5)
+// I  = palauttava, hyvin kevyt → 1.0
+// II = aerobinen pohja, reipas mutta ei happoja → 2.0
+// III= VO2max-työ, pitkät kovat vedot (>2 min) → 3.5
+// IV = nopeuskestävyys, maksimaaliset 30–60 s intervallit → 5.0
+// V  = nopeus, alle 10 s räjähteet + pitkät palautukset → 3.0
+const ZONE_WEIGHTS = [0, 1.0, 2.0, 3.5, 5.0, 3.0];
+
+// Lajin oletuskuormituspaino kun tehoaluetta ei ole kirjattu.
+// Asteikko vastaa suunnilleen ZONE_WEIGHTS-skaalaa.
+const SPORT_DEFAULT_WEIGHTS = {
+  // Hyvin kevyt — venyttely, huolto, jooga
+  'Kehonhuolto':     1.0, 'Liikkuvuus':      1.0, 'Jooga':           1.0, 'Pilates':      1.0,
+  // Kevyt — rauhallinen liikkuminen
+  'Kävely':          1.5, 'Hyötyliikunta':   1.5, 'Frisbeegolf':     1.5, 'Snorklaus':    1.5,
+  // Kohtalainen
+  'Sauvakävely':     2.0, 'SUP-lautailu':    2.0, 'Vesijumppa':      2.0, 'Tanssi':       2.0,
+  'Luistelu':        2.0, 'Rullaluistelu':   2.0, 'Laskettelu':      2.0, 'Lumilautailu': 2.0,
+  'Vaellus':         2.0, 'Hengenpidätys':   2.0, 'Vapaasukellus':   2.0, 'Melonta':      2.0,
+  'Kajakointi':      2.0, 'Crosstrainer':    2.0,
+  // Kohtalainen–korkea — tyypillinen harjoitteluvauhti
+  'Pyöräily':        2.5, 'Kuntosali':       2.5, 'Voimaharjoittelu':2.5, 'Kahvakuula':   2.5,
+  'Uinti':           2.5, 'Avovesiuinti':    2.5, 'Vesijuoksu':      2.5, 'Ryhmäliikunta':2.5,
+  'Soutu':           2.5, 'Surffaus':        2.5, 'Spinning':        2.5,
+  // Korkea — kilpailu/joukkueurheilu, intensiivinen aerobinen harjoittelu
+  'Juoksu':          3.0, 'Maastopyöräily':  3.0, 'Hiihto':          3.0, 'Suunnistus':   3.0,
+  'Salibandy':       3.0, 'Jääkiekko':       3.0, 'Jalkapallo':      3.0, 'Koripallo':    3.0,
+  'Lentopallo':      3.0, 'Tennis':          3.0, 'Padel':           3.0, 'Pesäpallo':    2.5,
+  'Kuntopiiri':      3.0, 'Kiipeily':        3.0, 'Sähly':           3.0,
+  // Hyvin korkea — kontaktilajit, maksimaaliset intervallitreenit
+  'Uppopallo':       3.5, 'BJJ':             3.5, 'HIIT':            3.5,
+  'Porrastreeni':    3.5, 'Squash':          3.5, 'Ultimate':        3.5,
+};
+const SPORT_DEFAULT_WEIGHT_FALLBACK = 2.0; // tuntematon laji
 
 // Single source of truth for all team names (may be overridden by Firestore settings/app)
 let TEAMS = ['Naisten Maajoukkue', 'Urheilusukeltajat', 'PSK-Kupla'];

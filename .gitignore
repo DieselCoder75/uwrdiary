@@ -67,3 +67,12 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# macOS
+.DS_Store
+
+# Claude Code session files
+.claude/
+
+# Dev tooling (local only)
+mockup-*.html

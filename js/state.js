@@ -3,6 +3,7 @@
 // ============================================================
 let currentUser    = null;
 let currentEntryId = null;  // null = new entry, string = editing
+let originalEntryData = null; // editin yhteydessä alkuperäinen entry-data records-laskuja varten
 let perfValue      = 0;
 let feelValue      = 0;
 let unsubEntries   = null;

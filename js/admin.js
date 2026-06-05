@@ -2,17 +2,81 @@
 // ADMIN PORTAL
 // ============================================================
 let cachedAdminUsers   = null;
-let cachedAdminUsersTs = 0;   // aikaleima millisekunteina
-const ADMIN_USERS_TTL  = 5 * 60 * 1000; // 5 min
+let cachedAdminUsersTs = 0;
+const ADMIN_USERS_TTL  = 24 * 60 * 60 * 1000; // 24 h
+const ADMIN_USERS_LS   = 'uppis_admin_users_';  // + uid
+
+// ── Varmistaa että cachedAdminUsers on ladattu (LS → Firestore) ──
+async function ensureAdminUsers(force = false) {
+  const lsKey = ADMIN_USERS_LS + currentUser.uid;
+  const stale  = Date.now() - cachedAdminUsersTs > ADMIN_USERS_TTL;
+
+  if (cachedAdminUsers && !stale && !force) return; // in-memory tuore
+
+  if (force) {
+    try { localStorage.removeItem(lsKey); } catch {}
+    cachedAdminUsers   = null;
+    cachedAdminUsersTs = 0;
+  }
+
+  // Kokeile localStorage
+  if (!cachedAdminUsers) {
+    try {
+      const raw = localStorage.getItem(lsKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.ts < ADMIN_USERS_TTL) {
+          cachedAdminUsers   = parsed.data;
+          cachedAdminUsersTs = parsed.ts;
+          return;
+        }
+      }
+    } catch {}
+  }
+
+  // Hae Firestoresta
+  const snap = await db.collection('users').get();
+  cachedAdminUsers = snap.docs.map(doc => ({
+    uid:        doc.id,
+    profile:    doc.data().profile || {},
+    email:      doc.data().email   || '',
+    coachOf:    doc.data().coachOf  || [],
+    recentCount: -1,
+  }));
+  cachedAdminUsersTs = Date.now();
+
+  // Hae 4 vk treenilasku rinnakkain (border-väriä varten)
+  const cutoff = firebase.firestore.Timestamp.fromDate(
+    new Date(Date.now() - 28 * 24 * 60 * 60 * 1000)
+  );
+  await Promise.all(cachedAdminUsers.map(async u => {
+    try {
+      const es = await db.collection('users').doc(u.uid)
+        .collection('entries').where('date', '>=', cutoff).get();
+      u.recentCount = es.size;
+    } catch (err) { console.error('recentCount fetch for', u.uid, ':', err); u.recentCount = -1; }
+  }));
+
+  // Tallenna localStorage:een
+  try {
+    localStorage.setItem(lsKey, JSON.stringify({ ts: cachedAdminUsersTs, data: cachedAdminUsers }));
+  } catch {}
+}
 
 // ── Impersonation ─────────────────────────────────────────────
 function startImpersonation(uid, name, email) {
-  // Haetaan joukkueet välimuistista — ei välitetä JSON:na onclick-attribuutista (lainausmerkkiongelma)
+  // Haetaan joukkueet ja profiili välimuistista
   const userRecord = cachedAdminUsers?.find(u => u.uid === uid);
   const teams = userRecord?.profile?.teams || [];
-  impersonating = { uid, name, email, teams };
+  impersonating = { uid, name, email, teams, profile: userRecord?.profile || {} };
   calLoadedForUid = null; // pakota kalenterin lataus valitulle käyttäjälle
+  // Nollaa profile-state-flagit (ennatyksetLoaded, testit jne.) jotta seuraava
+  // profiilin avaus lataa impersonoidun pelaajan datan, ei näytä adminin cachea
+  resetViewedProfileState();
   closeAdminPortal();
+
+  // Näytä pelaajan kuva/nimikirjain profiili-ikonissa
+  updateHeaderProfile(impersonating.profile);
 
   // Show banner
   el('impersonation-banner').classList.remove('hidden');
@@ -29,13 +93,18 @@ function startImpersonation(uid, name, email) {
 
   // Reload entries for the viewed user
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
+  allChartEntries = []; // pakota chart-datan uudelleenhaku impersonoidulle käyttäjälle
   loadEntries();
 }
 
 function stopImpersonation() {
   impersonating = null;
   calLoadedForUid = null; // pakota kalenterin uudelleenlataus omalle käyttäjälle
+  resetViewedProfileState(); // nollaa testit/ennätykset → ei vuoda toisen pelaajan dataa omaan profiiliin
   el('impersonation-banner').classList.add('hidden');
+
+  // Palauta oman käyttäjän kuva/nimikirjain
+  updateHeaderProfile();
 
   // Restore FAB if on loki sub-tab
   const activeSub = document.querySelector('#treenit-sub-tabs .sub-tab.active')?.dataset.subtab;
@@ -47,6 +116,7 @@ function stopImpersonation() {
 
   // Lataa oma loki taustalla (ei blokkaa portaalin avautumista)
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
+  allChartEntries = []; // pakota chart-datan paluu omaan käyttäjään
   loadEntries();
 }
 
@@ -128,8 +198,10 @@ function populateAdminPortalSelects(teamsToShow = TEAMS, showAll = true) {
     const sel = document.getElementById(id);
     if (!sel) return;
     while (sel.options.length > 1) sel.remove(1);
-    // "Kaikki" option only for admins in the activity selector
-    if (id === 'admin-report-team' && showAll) {
+    // "Kaikki" option molemmissa selecteissä, mutta VAIN adminille (showAll=isAdmin).
+    // Valmentaja ei saa "Kaikki"-vaihtoehtoa → ei pääse vie­mään muiden joukkueiden dataa.
+    const includeAll = showAll && (id === 'admin-report-team' || id === 'admin-csv-team-portal');
+    if (includeAll) {
       const allOpt = document.createElement('option');
       allOpt.value = '__all__';
       allOpt.textContent = 'Kaikki';
@@ -161,32 +233,10 @@ document.querySelectorAll('[data-admin-tab]').forEach(btn => {
 async function loadAdminUserListPortal(force = false) {
   const listEl = el('admin-user-list-portal');
   const stale  = Date.now() - cachedAdminUsersTs > ADMIN_USERS_TTL;
+  if (!cachedAdminUsers || stale || force)
+    listEl.innerHTML = '<p class="loading">Ladataan käyttäjiä…</p>';
   try {
-    if (!cachedAdminUsers || stale || force) {
-      listEl.innerHTML = '<p class="loading">Ladataan käyttäjiä…</p>';
-      const snap = await db.collection('users').get();
-      if (snap.empty) { listEl.innerHTML = '<p class="loading">Ei käyttäjiä.</p>'; return; }
-      cachedAdminUsers = snap.docs.map(doc => ({
-        uid:     doc.id,
-        profile: doc.data().profile || {},
-        email:   doc.data().email   || '',
-        coachOf: doc.data().coachOf  || [],
-        recentCount: -1, // ladataan alla
-      }));
-      cachedAdminUsersTs = Date.now();
-
-      // Hae 4 viikon treenilasku rinnakkain (border-väri = sama kuin act-status)
-      const cutoff = firebase.firestore.Timestamp.fromDate(
-        new Date(Date.now() - 28 * 24 * 60 * 60 * 1000)
-      );
-      await Promise.all(cachedAdminUsers.map(async u => {
-        try {
-          const es = await db.collection('users').doc(u.uid)
-            .collection('entries').where('date', '>=', cutoff).get();
-          u.recentCount = es.size;
-        } catch (err) { console.error('recentCount fetch for', u.uid, ':', err); u.recentCount = -1; }
-      }));
-    }
+    await ensureAdminUsers(force);
     renderAdminUserListPortal();
   } catch (err) {
     console.error(err);
@@ -220,10 +270,16 @@ function renderAdminUserListPortal() {
     return na.localeCompare(nb, 'fi');
   });
 
-  // "Päivitä lista" -nappi ylhäällä (kohta 2)
+  // "Päivitä lista" -rivi ylhäällä — tyylitelty kuten joukkuesivun toolbar
+  const cacheTime = (() => {
+    if (!cachedAdminUsersTs) return '';
+    const d = new Date(cachedAdminUsersTs);
+    return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`;
+  })();
   const refreshRow = `<div class="admin-list-refresh-row">
     <span class="admin-list-count">${cachedAdminUsers.length} käyttäjää</span>
-    <button class="btn-secondary admin-list-refresh-btn" onclick="loadAdminUserListPortal(true)">↻ Päivitä</button>
+    <span class="joukkue-cache-ts" title="Datan ikä">${cacheTime}</span>
+    <button class="refresh-btn" data-act="refresh-users" title="Päivitä lista" aria-label="Päivitä">↻</button>
   </div>`;
 
   // Borderin väri = sama kuin act-status pallukka Aktiivisuus-välilehdellä
@@ -259,7 +315,7 @@ function renderAdminUserListPortal() {
     const coachCheckboxes = TEAMS.map(team => `
       <label class="coach-team-check">
         <input type="checkbox"
-               onchange="adminToggleCoach('${u.uid}', '${escapeHtml(team)}', this.checked)"
+               data-act="toggle-coach" data-uid="${escapeHtml(u.uid)}" data-team="${escapeHtml(team)}"
                ${coachOf.includes(team) ? 'checked' : ''}>
         <span>${escapeHtml(team)}</span>
       </label>`).join('');
@@ -274,9 +330,9 @@ function renderAdminUserListPortal() {
             ${coachBadge}
           </div>
           <div class="admin-user-actions">
-            <button class="btn-sm btn-view-sm" onclick="startImpersonation('${u.uid}', '${escapeHtml(displayName || email)}', '${escapeHtml(email)}')">Avaa loki</button>
-            <button class="btn-sm btn-coach-sm" onclick="toggleCoachPanel('${u.uid}')">Valmentaja</button>
-            <button class="btn-sm btn-danger-sm" onclick="adminDeleteUser('${u.uid}', '${escapeHtml(email)}')">Poista</button>
+            <button class="btn-sm btn-view-sm" data-act="impersonate" data-uid="${escapeHtml(u.uid)}" data-name="${escapeHtml(displayName || email)}" data-email="${escapeHtml(email)}">Avaa loki</button>
+            <button class="btn-sm btn-coach-sm" data-act="toggle-coach-panel" data-uid="${escapeHtml(u.uid)}">Valmentaja</button>
+            <button class="btn-sm btn-danger-sm" data-act="delete-user" data-uid="${escapeHtml(u.uid)}" data-email="${escapeHtml(email)}">Poista</button>
           </div>
         </div>
         <div class="coach-panel hidden" id="coach-panel-${u.uid}">
@@ -326,6 +382,19 @@ async function adminToggleCoach(uid, team, isCoach) {
         }
       }
     }
+    // Päivitä myös LS-cache jotta seuraava sivulataus ei lataa vanhentunutta dataa
+    try {
+      const lsKey = ADMIN_USERS_LS + currentUser.uid;
+      const raw = localStorage.getItem(lsKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const entry = parsed.data?.find(u => u.uid === uid);
+        if (entry) {
+          entry.coachOf = user ? user.coachOf : (isCoach ? [team] : []);
+          localStorage.setItem(lsKey, JSON.stringify(parsed));
+        }
+      }
+    } catch {}
     toast(isCoach ? `${team}: valmentaja lisätty` : `${team}: valmentaja poistettu`, 'success');
   } catch (err) {
     console.error(err);
@@ -344,7 +413,7 @@ function renderAdminTeamsList() {
   listEl.innerHTML = TEAMS.map(team => `
     <div class="admin-team-item">
       <span class="admin-team-name">${escapeHtml(team)}</span>
-      <button class="admin-team-remove-btn" onclick="adminRemoveTeam('${escapeHtml(team)}')">Poista</button>
+      <button class="admin-team-remove-btn" data-act="remove-team" data-team="${escapeHtml(team)}">Poista</button>
     </div>`).join('');
 }
 
@@ -389,24 +458,20 @@ el('admin-report-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Ladataan…';
   try {
-    await renderActivityReport(team);
+    await renderActivityReport(team, true);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Lataa';
   }
 });
 
-async function renderActivityReport(team) {
+const ACT_REPORT_TTL = 60 * 60 * 1000; // 1 h
+
+async function renderActivityReport(team, force = false) {
   const container = el('admin-activity-report');
   container.innerHTML = '<p class="loading">Haetaan harjoitustietoja…</p>';
 
-  if (!cachedAdminUsers) {
-    const snap = await db.collection('users').get();
-    cachedAdminUsers = snap.docs.map(d => ({
-      uid: d.id, profile: d.data().profile || {}, email: d.data().email || '', coachOf: d.data().coachOf || [],
-    }));
-    cachedAdminUsersTs = Date.now();
-  }
+  await ensureAdminUsers();
 
   const members = team === '__all__'
     ? cachedAdminUsers
@@ -424,6 +489,21 @@ async function renderActivityReport(team) {
   const weeks  = getLastNWeeks(12);
   const cutoff = firebase.firestore.Timestamp.fromDate(weeks[0]);
   const now    = firebase.firestore.Timestamp.fromDate(new Date());
+
+  // ── Cache ──
+  const actCacheKey = `uppis_act_${currentUser.uid}_${team}_${weeks[0].getTime()}`;
+  if (!force) {
+    try {
+      const raw = localStorage.getItem(actCacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.ts < ACT_REPORT_TTL) {
+          renderActivityReportHtml(container, parsed.data, weeks);
+          return;
+        }
+      }
+    } catch {}
+  }
 
   // Fetch entries for all members in parallel
   const memberData = await Promise.all(members.map(async u => {
@@ -456,9 +536,23 @@ async function renderActivityReport(team) {
       total4,
       total8,
       total12,
-      lastDate,
+      lastDate: lastDate ? lastDate.getTime() : null,
     };
   }));
+
+  // Save to cache
+  try {
+    localStorage.setItem(actCacheKey, JSON.stringify({ ts: Date.now(), data: memberData }));
+  } catch {}
+
+  renderActivityReportHtml(container, memberData, weeks);
+}
+
+function renderActivityReportHtml(container, memberData, weeks) {
+  // Restore lastDate if stored as timestamp number
+  memberData.forEach(m => {
+    if (m.lastDate && typeof m.lastDate === 'number') m.lastDate = new Date(m.lastDate);
+  });
 
   // Sort: most active first
   memberData.sort((a, b) => b.total4 - a.total4 || b.total12 - a.total12);
@@ -531,17 +625,9 @@ async function renderCsvPlayerList(team) {
   const container = el('admin-csv-player-list');
   if (!container) return;
 
-  // Ensure users are loaded
-  if (!cachedAdminUsers) {
-    container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-muted)">Ladataan…</p>';
-    const snap = await db.collection('users').get();
-    cachedAdminUsers = snap.docs.map(d => ({
-      uid: d.id, profile: d.data().profile || {}, email: d.data().email || '', coachOf: d.data().coachOf || [],
-    }));
-    cachedAdminUsersTs = Date.now();
-  }
+  await ensureAdminUsers();
 
-  const members = team === '__ALL__'
+  const members = team === '__all__'
     ? cachedAdminUsers
     : cachedAdminUsers.filter(u => {
         const teams = u.profile.teams || (u.profile.team ? [u.profile.team] : []);
@@ -558,13 +644,61 @@ async function renderCsvPlayerList(team) {
     return `
       <div class="csv-player-item">
         <span class="csv-player-name">${escapeHtml(name)}</span>
-        <button class="btn-primary admin-csv-btn" onclick="adminExportPlayerCsv('${u.uid}', '${escapeHtml(name)}', this)">Lataa CSV</button>
+        <button class="btn-primary admin-csv-btn" data-act="export-csv" data-uid="${escapeHtml(u.uid)}" data-name="${escapeHtml(name)}">Lataa CSV</button>
       </div>`;
   }).join('');
 }
 
+// ── Event delegation (korvaa inline onclick/onchange — XSS-suojaus) ──
+// Käyttäjän nimet/sähköpostit luetaan data-attribuuteista .dataset:in kautta,
+// jolloin niitä ei koskaan tulkita JS-koodina (vrt. vanha inline-onclick).
+// Kuuntelijat kiinnitetään pysyviin containereihin → kestävät innerHTML-uudelleenrenderöinnin.
+(function initAdminDelegation() {
+  const onClick = (containerId, handler) => {
+    const c = el(containerId);
+    if (c) c.addEventListener('click', e => {
+      const btn = e.target.closest('[data-act]');
+      if (btn && c.contains(btn)) handler(btn.dataset.act, btn);
+    });
+  };
+
+  // Käyttäjälista: klikkaukset
+  onClick('admin-user-list-portal', (act, btn) => {
+    const d = btn.dataset;
+    if (act === 'refresh-users')      loadAdminUserListPortal(true);
+    else if (act === 'impersonate')   startImpersonation(d.uid, d.name, d.email);
+    else if (act === 'toggle-coach-panel') toggleCoachPanel(d.uid);
+    else if (act === 'delete-user')   adminDeleteUser(d.uid, d.email);
+  });
+  // Käyttäjälista: valmentaja-checkboxit (change)
+  const userList = el('admin-user-list-portal');
+  if (userList) userList.addEventListener('change', e => {
+    const cb = e.target.closest('[data-act="toggle-coach"]');
+    if (cb) adminToggleCoach(cb.dataset.uid, cb.dataset.team, cb.checked);
+  });
+
+  // Joukkueiden hallinta
+  onClick('admin-teams-list', (act, btn) => {
+    if (act === 'remove-team') adminRemoveTeam(btn.dataset.team);
+  });
+
+  // CSV-pelaajalista
+  onClick('admin-csv-player-list', (act, btn) => {
+    if (act === 'export-csv') adminExportPlayerCsv(btn.dataset.uid, btn.dataset.name, btn);
+  });
+
+  // Viikkosuunnitelma
+  onClick('admin-week-plan-list', (act, btn) => {
+    if (act === 'edit-zone') openZonePicker(btn.dataset.key, Number(btn.dataset.week), btn.dataset.zone);
+  });
+
+  // Tehoaluevalitsin
+  onClick('zone-picker-buttons', (act, btn) => {
+    if (act === 'select-zone') selectZone(btn.dataset.zone);
+  });
+})();
+
 // ── Legacy modal (kept for backward compat) ───────────────────
-el('admin-panel-btn') // already wired above
 el('close-admin').addEventListener('click', closeAdminModal);
 el('admin-backdrop').addEventListener('click', closeAdminModal);
 
@@ -581,14 +715,8 @@ el('admin-csv-team-btn').addEventListener('click', async () => {
 });
 
 async function adminExportTeamCsv(team) {
-  if (!cachedAdminUsers) {
-    const snap = await db.collection('users').get();
-    cachedAdminUsers = snap.docs.map(d => ({
-      uid: d.id, profile: d.data().profile || {}, email: d.data().email || '', coachOf: d.data().coachOf || [],
-    }));
-    cachedAdminUsersTs = Date.now();
-  }
-  const members = team === '__ALL__'
+  await ensureAdminUsers();
+  const members = team === '__all__'
     ? cachedAdminUsers
     : cachedAdminUsers.filter(u => {
         const teams = u.profile.teams || (u.profile.team ? [u.profile.team] : []);
@@ -596,7 +724,7 @@ async function adminExportTeamCsv(team) {
       });
 
   if (members.length === 0) {
-    toast(team === '__ALL__' ? 'Ei käyttäjiä.' : 'Ei jäseniä: ' + team, 'info');
+    toast(team === '__all__' ? 'Ei käyttäjiä.' : 'Ei jäseniä: ' + team, 'info');
     return;
   }
 
@@ -609,7 +737,7 @@ async function adminExportTeamCsv(team) {
   }));
 
   rows.sort((a, b) => (a.date?.toMillis?.() || 0) - (b.date?.toMillis?.() || 0));
-  const filename = team === '__ALL__'
+  const filename = team === '__all__'
     ? 'kaikki_pelaajat_harjoitukset.csv'
     : `${team.replace(/\s+/g, '_')}_harjoitukset.csv`;
   downloadCsv(rows, filename);
@@ -652,7 +780,8 @@ async function adminDeleteUser(uid, email) {
   if (!yes) return;
   try {
     await deleteAllUserData(uid);
-    cachedAdminUsers = null;
+    try { localStorage.removeItem(ADMIN_USERS_LS + currentUser.uid); } catch {}
+    cachedAdminUsers   = null;
     cachedAdminUsersTs = 0;
     await loadAdminUserListPortal();
   } catch (err) {
@@ -1001,7 +1130,7 @@ function renderWeekPlanSection() {
             : `<span class="week-plan-empty">—</span>`}
         </div>
         <button class="btn-secondary week-plan-edit-btn"
-                onclick="openZonePicker('${key}', ${week}, '${zone}')">Muokkaa</button>
+                data-act="edit-zone" data-key="${escapeHtml(key)}" data-week="${week}" data-zone="${escapeHtml(zone)}">Muokkaa</button>
       </div>`);
   }
 
@@ -1014,7 +1143,7 @@ function openZonePicker(weekKey, weekNum, currentZone) {
 
   el('zone-picker-buttons').innerHTML = ZONE_OPTIONS.map(z => `
     <button class="zone-opt-btn${z === currentZone ? ' active' : ''}"
-            onclick="selectZone('${z}')">${z}</button>
+            data-act="select-zone" data-zone="${escapeHtml(z)}">${z}</button>
   `).join('');
 
   el('zone-picker-clear').classList.toggle('hidden', !currentZone);
@@ -1063,6 +1192,219 @@ async function saveWeekPlanToFirestore() {
     toast('Tallennus epäonnistui.', 'error');
   }
 }
+
+// ============================================================
+// VIIKKO-OHJE — viikoittainen valmentajan ohjeistus (vain admin)
+// ============================================================
+
+const _ZONE_DATA = {
+  1: {
+    name: 'Peruskunto',
+    intro: 'Tällä viikolla teemana on <strong>peruskunto</strong>, eli tavoitteena on <strong>kevyt aerobinen harjoittelu</strong>. Kerätään aerobista pohjaa matalalla intensiteetillä – syke rauhallisena, happoja ei tule. Palauttavat viikot ovat yhtä tärkeitä kuin kovat: keho kehittyy levossa.',
+    sections: [
+      {
+        title: 'Peruskuntotreeni (I-alue)',
+        subtitle: 'Syke 50–70 % maksimista, kaikki viikon harjoitukset',
+        items: [
+          '✅ Kevyt uinti rauhallisella tahdilla',
+          '✅ Rauhallinen pyöräily tai hölkkä',
+          '✅ Kävely tai vesijuoksu',
+          '✅ Liikkuvuus ja kehonhuolto',
+          '✅ Kevyt saliharjoittelu',
+        ],
+        postText: 'Myös pk-alueella voi lisätä muutaman alle 10 s räjähtävän spurtin hyvän lämmittelyn jälkeen – se pitää hermoston virkeänä.',
+      },
+    ],
+  },
+  2: {
+    name: 'Kestävyys',
+    intro: 'Tällä viikolla teemana on <strong>kestävyys</strong>, eli tavoitteena on <strong>3–4 pitkähköä, tasaista harjoitusta</strong>. Syke on hieman pk-aluetta ylempänä, mutta puhe onnistuu vielä.',
+    sections: [
+      {
+        title: 'Kestävyysharjoitus (II-alue)',
+        subtitle: 'Syke 60–75 % maksimista, 3–4 harjoitusta viikossa',
+        items: [
+          '✅ Uinti: pitkiä tasaisia vetoja (esim. 1500–2000 m)',
+          '✅ Pyöräily tai juoksu: 40–60 min tasaisella sykkeellä',
+          '✅ Hiihto, soutu tai crosstrainer',
+          '✅ Pitkä lenkki tai vaellus',
+        ],
+        postText: 'Kestävyysviikon harjoitukset voivat tuntua helpoilta, mutta niiden kumulatiivinen vaikutus on suuri. Pidä intensiteetti kurissa – ei ylikierroksille.',
+      },
+    ],
+  },
+  3: {
+    name: 'Maksimikestävyys',
+    intro: 'Tällä viikolla teemana on <strong>maksimikestävyys</strong>, eli tavoitteena on tehdä <strong>2–3 III-alueen harjoitusta</strong>. Tarjolla on siis suhteellisen pitkiä (2–5 min) kovia vetoja melko lyhyillä palautuksilla (30 s–1 min). Uinti on yksi helpoimmista tavoista osua III-alueelle. Harjoitukset kehittävät maitohapon sietokykyä ja työntävät suorituskyvyn ylärajaa eteenpäin.',
+    sections: [
+      {
+        title: 'Maksimikestävyys (III-alue)',
+        subtitle: 'Syke 80–90 % maksimista, 2–3 harjoitusta viikossa',
+        preText: 'Alla esimerkkejä pääsarjoista. Rinnalla voi olla myös toinen samantyyppinen tai hieman kevennetty sarja.',
+        items: [
+          '✅ Uinti: 5 × 200 m kovaa, 30 s palautuksella',
+          '✅ Juoksu / pyöräily: 4 × 5 min kovaa, 1 min palautuksella',
+          '✅ Ylämäki-/porrastreeni: 5 × 2 min nousua kovilla sykkeillä',
+        ],
+        postText: 'Muut viikon treenit voivat olla palauttavia pk-alueen harjoituksia tai salitreenejä. Tahdita raskaampia päiviä palauttavien harjoitusten kanssa, jotta voit tehdä kovat treenit aidosti kovalla teholla.',
+      },
+      {
+        title: 'Peruskuntotreeni (I-alue)',
+        subtitle: 'Syke 50–70 % maksimista, palauttavat harjoitukset välipäivinä',
+        items: [
+          '✅ Kevyt uinti',
+          '✅ Rauhallinen pyöräily',
+          '✅ Kävely tai kevyt hölkkä',
+          '✅ Liikkuvuus ja kehonhuolto',
+        ],
+      },
+    ],
+  },
+  4: {
+    name: 'Nopeuskestävyys',
+    intro: 'Tällä viikolla teemana on <strong>nopeuskestävyys</strong>, eli tavoitteena on tehdä <strong>2–3 IV-alueen harjoitusta</strong>. Painotus on siis lyhyissä erittäin kovissa 30–50 s suorituksissa melko lyhyillä palautuksilla (esim. 30 s). Pelinomaisen uppopallon lisäksi uinti on yksi helpoimmista tavoista osua IV-alueelle. Harjoitukset kehittävät kykyä toistaa kovia uppopallo-vaihdon mittaisia suorituksia ja palautua niistä nopeasti.',
+    sections: [
+      {
+        title: 'Nopeuskestävyys (IV-alue)',
+        subtitle: 'Syke 90–100 % maksimista, 2–3 harjoitusta viikossa',
+        preText: 'Alla esimerkkejä pääsarjoista. Rinnalla voi olla myös useampi samantyyppinen tai hieman kevennetty sarja.',
+        items: [
+          '✅ Uinti: 10 × 25 m sukellus + 25 m uinti lähes täysillä, 30 s palautus',
+          '✅ Juoksu: 2 × 4 × 100 m loivahkoon ylämäkeen kiihdyttäen 80–100 %, kävely takaisin, sarjojen välissä palauttavaa',
+          '✅ Porrastreeni: 6–8 × 30–40 s täysillä, palautuksena kävely alas',
+        ],
+        postText: 'Muut viikon treenit voivat olla palauttavia pk-alueen harjoituksia tai salitreenejä. Tahdita raskaampia päiviä palauttavien harjoitusten kanssa, jotta voit tehdä kovat treenit aidosti kovalla teholla.',
+      },
+      {
+        title: 'Peruskuntotreeni (I-alue)',
+        subtitle: 'Syke 50–70 % maksimista, palauttavat harjoitukset välipäivinä',
+        items: [
+          '✅ Kevyt uinti',
+          '✅ Rauhallinen pyöräily',
+          '✅ Kävely tai kevyt hölkkä',
+          '✅ Liikkuvuus ja kehonhuolto',
+        ],
+      },
+    ],
+  },
+  5: {
+    name: 'Nopeus',
+    intro: 'Tällä viikolla teemana on <strong>nopeus</strong>, eli <strong>räjähtäviä alle 10 sekunnin maksimisuorituksia</strong> erittäin pitkillä palautuksilla. Tavoitteena on <strong>1–2 laadukasta harjoitusta</strong>. Lepoa enemmän kuin normaalisti – hermosto on etusijalla.',
+    sections: [
+      {
+        title: 'Nopeusharjoitus (V-alue)',
+        subtitle: '1–2 harjoitusta viikossa, palautukset 5–10 min',
+        preText: 'Alla esimerkkejä pääsarjoista.',
+        items: [
+          '✅ Uinti: 6–8 × 25 m täysin kovaa, 5 min palautuksella',
+          '✅ Juoksu: 8–10 × 50–100 m sprinttejä, täyspalautus',
+          '✅ Räjähtävät hyppelyt tai suunnanvaihdot, lyhyet sarjat',
+        ],
+        postText: 'V-alueen harjoituksia ei koskaan väsyneenä. Loput viikon harjoituksista ovat kevyttä pk-työtä tai kokonaan lepoa.',
+      },
+      {
+        title: 'Peruskuntotreeni (I-alue)',
+        subtitle: 'Lepoa tai kevyttä liikettä välipäivinä',
+        items: [
+          '✅ Kevyt uinti tai liikkuvuusharjoittelu',
+          '✅ Rauhallinen kävely',
+        ],
+      },
+    ],
+  },
+};
+
+function _viikkoohjeZoneHtml(zoneStr) {
+  const zones = typeof parseZoneStr === 'function' ? parseZoneStr(zoneStr) : [];
+  const primaryIdx = zones.length ? Math.max(...zones) : 0;
+  const data = _ZONE_DATA[primaryIdx];
+  if (!data) return `<p>Ei sisältöä tehoalueelle ${escapeHtml(zoneStr)}.</p>`;
+
+  const sectionsHtml = data.sections.map(s => {
+    const subtitleHtml = s.subtitle  ? `<p class="viikkoohje-subtitle">${escapeHtml(s.subtitle)}</p>` : '';
+    const preHtml      = s.preText   ? `<p>${escapeHtml(s.preText)}</p>`   : '';
+    const postHtml     = s.postText  ? `<p>${escapeHtml(s.postText)}</p>`  : '';
+    const itemsHtml    = s.items.length
+      ? `<ul>${s.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : '';
+    return `<h4>${escapeHtml(s.title)}</h4>${subtitleHtml}${preHtml}${itemsHtml}${postHtml}`;
+  }).join('');
+
+  // intro voi sisältää <strong>-tageja — sisältö on kovakoodattu, ei käyttäjädataa
+  return `<p>${data.intro}</p>${sectionsHtml}`;
+}
+
+function _viikkoohjeUpcomingHtml(currentMonday) {
+  const rows = [1, 2, 3].map(offset => {
+    const mon = weeksAgoMonday(-offset);
+    const { week } = calIsoWeekData(mon);
+    const zone = calPlannedZone(mon);
+    const zoneNums  = zone ? parseZoneStr(zone) : [];
+    const zoneName  = zoneNums.map(z => _ZONE_DATA[z]?.name).filter(Boolean).join(' / ');
+    const zoneColor = zoneNums.length ? PERF_COLORS[zoneNums[zoneNums.length - 1] - 1] : 'var(--text-muted)';
+    const zoneLabel = zone
+      ? `<span class="viikkoohje-upcoming-zone" style="color:${zoneColor}">${escapeHtml(zone)}${zoneName ? ` – ${escapeHtml(zoneName)}` : ''}</span>`
+      : `<span class="viikkoohje-upcoming-zone viikkoohje-upcoming-empty">–</span>`;
+    return `<div class="viikkoohje-upcoming-row">
+      <span class="viikkoohje-upcoming-week">Vk ${week}</span>
+      ${zoneLabel}
+    </div>`;
+  }).join('');
+
+  return `<h4>Tulevat viikot</h4><div class="viikkoohje-upcoming">${rows}</div>`;
+}
+
+let _viikkoohjeOffset = 0; // 0 = kuluva vko, 1–3 = tulevat
+
+function selectViikkoOhjeWeek(offset) {
+  _viikkoohjeOffset = offset;
+  renderViikkoOhjeTab();
+}
+
+function renderViikkoOhjeTab() {
+  const container = el('viikkoohje-content');
+  if (!container) return;
+
+  // Toggle-palkki: kuluva + 3 seuraavaa viikkoa
+  const toggleHtml = [0, 1, 2, 3].map(i => {
+    const mon  = weeksAgoMonday(-i);
+    const { week: w } = calIsoWeekData(mon);
+    const z    = calPlannedZone(mon);
+    const zNum = z ? parseZoneStr(z).slice(-1)[0] : 0;
+    const col  = zNum ? PERF_COLORS[zNum - 1] : 'var(--border-light)';
+    const isActive = i === _viikkoohjeOffset;
+    const style = isActive
+      ? `background:${col};border-color:${col};color:#fff`
+      : `background:#fff;border-color:${col};color:var(--blue)`;
+    return `<button class="viikkoohje-toggle-btn" style="${style}" onclick="selectViikkoOhjeWeek(${i})">Vk ${w}</button>`;
+  }).join('');
+
+  // Sisältö valitulle viikolle
+  const monday = weeksAgoMonday(-_viikkoohjeOffset);
+  const { week } = calIsoWeekData(monday);
+  const zone = calPlannedZone(monday);
+
+  let bodyHtml;
+  if (!zone) {
+    bodyHtml = `<p>Viikolle ${week} ei ole asetettu tehoaluetta viikkosuunnitelmassa. Avaa Kalenteri-välilehti ja lisää tehoalue viikolle.</p>`;
+  } else {
+    bodyHtml = _viikkoohjeZoneHtml(zone);
+  }
+
+  const zoneNums  = zone ? parseZoneStr(zone) : [];
+  const zoneName  = zoneNums.map(z => _ZONE_DATA[z]?.name).filter(Boolean).join(' / ');
+  const titleZone = zoneName ? ` – ${zoneName}` : '';
+
+  container.innerHTML = `
+    <div class="viikkoohje-toggle">${toggleHtml}</div>
+    <div class="viikkoohje-card">
+      <h4 class="viikkoohje-week-title">Viikko ${week}${titleZone}</h4>
+      <div class="viikkoohje-output">${bodyHtml}</div>
+    </div>
+  `;
+}
+
+window.renderViikkoOhjeTab  = renderViikkoOhjeTab;
+window.selectViikkoOhjeWeek = selectViikkoOhjeWeek;
 
 // Expose for HTML onclick
 window.adminExportPlayerCsv    = adminExportPlayerCsv;

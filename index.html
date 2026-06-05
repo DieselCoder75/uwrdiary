@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=240">
+  <link rel="stylesheet" href="styles.css?v=424">
 </head>
 <body>
 
@@ -22,6 +22,8 @@
   <div id="auth-view" class="view">
     <div class="auth-container">
       <div class="auth-logo"><img src="icon-192.png" alt="UWR Diary"></div><h1>UWR Diary</h1>
+      <p id="auth-greeting" class="auth-greeting"></p>
+      <div id="auth-week-zone" class="auth-week-zone"></div>
       <div class="auth-tabs">
         <button class="tab-btn active" id="login-tab">Kirjaudu</button>
         <button class="tab-btn" id="register-tab">Rekisteröidy</button>
@@ -36,6 +38,10 @@
         <button type="button" id="forgot-btn" class="forgot-btn">Unohditko salasanan?</button>
       </p>
       <p id="forgot-success" class="forgot-success hidden"></p>
+      <div class="auth-footer">
+        <span id="auth-version" class="auth-footer-left">v—</span>
+        <span class="auth-footer-right">Created by Janne Lind</span>
+      </div>
     </div>
   </div>
 
@@ -45,9 +51,12 @@
     <!-- Sticky top bar: header + nav tabs -->
     <div class="app-top-bar">
       <header>
-        <h1>UWR Diary</h1>
+        <div class="header-title-group">
+          <span class="header-app-name">UWR DIARY</span>
+          <span id="header-tab-title" class="header-tab-title">Treenit</span>
+        </div>
         <div class="header-actions">
-          <span id="header-firstname"></span>
+          <span id="header-firstname" style="display:none"></span>
           <button id="profile-btn" class="avatar-btn" aria-label="Profiili">
             <img id="header-avatar" class="hidden" alt="Profiilikuva">
             <span id="header-initials"></span>
@@ -65,16 +74,28 @@
       <div class="sub-tabs" id="treenit-sub-tabs">
         <button class="sub-tab active" data-subtab="loki">Loki</button>
         <button class="sub-tab" data-subtab="kalenteri">Kalenteri</button>
+        <button class="sub-tab hidden" data-subtab="aicoach" id="aicoach-sub-tab-btn">AI Coach</button>
       </div>
       <!-- Sub-tabs: osa sticky headeria, näkyy vain Trendit-välilehdellä -->
       <div class="sub-tabs hidden" id="trendit-sub-tabs">
         <button class="sub-tab active" data-subtab="omat">Omat</button>
         <button class="sub-tab" data-subtab="vertailu">Vertailu</button>
+        <button class="sub-tab" data-subtab="kuorma" id="kuorma-sub-tab-btn">Kuorma</button>
+      </div>
+      <!-- Sub-tabs: osa sticky headeria, näkyy vain Joukkue-välilehdellä -->
+      <div class="sub-tabs hidden" id="joukkue-sub-tabs">
+        <button class="sub-tab active" data-subtab="fiidi">Fiidi</button>
+        <button class="sub-tab" id="viikkoohje-sub-tab-btn" data-subtab="viikkoohje">Viikko-ohje</button>
+        <button class="sub-tab" data-subtab="tapahtumat">Tapahtumat</button>
       </div>
       <!-- Impersonation banner -->
       <div id="impersonation-banner" class="impersonation-banner hidden">
         <span id="impersonation-banner-text">Katselet käyttäjänä: <strong id="impersonation-banner-name"></strong></span>
         <button id="impersonation-exit-btn" class="impersonation-exit-btn">✕ Lopeta</button>
+      </div>
+      <!-- Offline banner -->
+      <div id="offline-banner" class="offline-banner hidden">
+        <span>📵 Ei yhteyttä — treenikerjaukset tallennetaan ja synkataan automaattisesti kun yhteys palaa</span>
       </div>
     </div>
 
@@ -89,6 +110,7 @@
             <span id="period-label" class="period-label"></span>
             <button id="refresh-btn" class="refresh-btn" title="Päivitä treenit" aria-label="Päivitä">↻</button>
           </div>
+          <div id="week-summary-card" class="week-summary-card hidden"></div>
           <div id="entries-list"></div>
           <div id="empty-state" class="hidden">
             <div class="empty-icon">🏅</div>
@@ -96,7 +118,7 @@
             <p class="empty-sub">Lisää ensimmäinen harjoitus + painikkeella!</p>
           </div>
           <div id="load-more-wrap" class="load-more-wrap hidden">
-            <button id="load-more-btn" class="load-more-btn">Lataa aiemmat 4 viikkoa</button>
+            <button id="load-more-btn" class="load-more-btn">Lataa 2 viikkoa lisää</button>
           </div>
           <div id="no-more-entries" class="no-more-entries hidden">Kaikki treenit ladattu</div>
         </div>
@@ -104,6 +126,19 @@
         <!-- Ali-tab: Kalenteri -->
         <div id="subtab-kalenteri" class="hidden">
           <div id="calendar-container"></div>
+        </div>
+
+        <!-- Ali-tab: AI Coach (vain admin) -->
+        <div id="subtab-aicoach" class="hidden">
+          <div class="chart-section aicoach-card">
+            <div class="aicoach-header">
+              <p class="chart-title">AI Coach</p>
+              <button id="aicoach-run-btn" class="btn-secondary aicoach-run-btn">↻ Analysoi uudelleen</button>
+            </div>
+            <p id="aicoach-intro" class="aicoach-intro"></p>
+            <p id="aicoach-meta" class="aicoach-meta"></p>
+            <div id="aicoach-output" class="aicoach-output"><p class="loading">Ladataan…</p></div>
+          </div>
         </div>
 
       </div>
@@ -128,10 +163,29 @@
               <p class="chart-title">Minuutit – Viikko – Viimeiset 12 viikkoa</p>
               <div class="chart-wrap"><canvas id="chart-weekly-minutes"></canvas></div>
             </div>
+            <div class="chart-section">
+              <p class="chart-title">Treenikerrat – Viikko – Viimeiset 12 viikkoa</p>
+              <div class="chart-wrap"><canvas id="chart-weekly-count"></canvas></div>
+            </div>
             <div class="chart-legend" id="feeling-legend"></div>
             <div class="chart-section">
               <p class="chart-title">Fiilikset – Viikko – Viimeiset 12 viikkoa</p>
               <div class="chart-wrap"><canvas id="chart-weekly-feeling"></canvas></div>
+            </div>
+            <div class="chart-section">
+              <p class="chart-title">Tehoaluejakauma – Viimeiset 12 viikkoa</p>
+              <div class="pie-charts-row">
+                <div class="pie-chart-wrap">
+                  <p class="pie-chart-sub">Minuutit</p>
+                  <canvas id="chart-pie-minutes"></canvas>
+                  <div id="pie-minutes-legend" class="pie-legend"></div>
+                </div>
+                <div class="pie-chart-wrap">
+                  <p class="pie-chart-sub">Treenikerrat</p>
+                  <canvas id="chart-pie-count"></canvas>
+                  <div id="pie-count-legend" class="pie-legend"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -153,22 +207,107 @@
           </div>
         </div>
 
+        <!-- Ali-tab: Kuorma (vain admin) -->
+        <div id="subtab-kuorma" class="hidden">
+
+          <!-- Disclaimer (collapsable, tila tallennetaan profiiliin) -->
+          <details class="kuorma-disclaimer" id="kuorma-disclaimer" open>
+            <summary class="kuorma-disclaimer-title">Kuorman arviointityökalu</summary>
+            <div class="kuorma-disclaimer-body">
+              <p><strong>ACWR</strong> (Acute:Chronic Workload Ratio) vertaa viime viikkojen harjoituskuormaa pidempään pohjakuntoosi. Luku <strong>0.8-1.3</strong> tarkoittaa, että kuormitus on linjassa pohjasi kanssa. Yli <strong>1.5</strong> kertoo äkillisestä piikistä - keho ei ehkä ehdi palautua, ja loukkaantumisriski kasvaa. Alle <strong>0.8</strong> tarkoittaa, että harjoittelu on keventynyt suhteessa pohjaan.</p>
+              <p>Luvut ovat suuntaa-antavia. Kuormittavuus on yksilöllinen kokemus - uni, ravitsemus, stressi ja elämäntilanne vaikuttavat kaikki palautumiseen aivan yhtä paljon kuin harjoitusmäärä. Älä tee harjoittelupäätöksiä pelkän ACWR-luvun perusteella.</p>
+              <p class="kuorma-disclaimer-method">Menetelmä: EWMA (Exponentially Weighted Moving Average) · λ<sub>akuutti</sub> = 0.25 (7 pv) · λ<sub>krooninen</sub> = 0.069 (28 pv) · Kuorma AU = tehoaluekerroin × kesto min</p>
+            </div>
+          </details>
+
+          <!-- ACWR nyt -->
+          <div class="chart-section">
+            <p class="chart-title">Harjoituskuorma nyt</p>
+            <div id="kuorma-acwr-section"><p class="loading">Lasketaan…</p></div>
+          </div>
+
+          <!-- ATL / CTL kehitys -->
+          <div class="chart-section">
+            <p class="chart-title">Akuutti vs krooninen kuorma – 12 viikkoa</p>
+            <p class="chart-subtitle">Sininen = akuutti kuorma (7 pv EWMA), oranssi = krooninen pohja (28 pv EWMA)</p>
+            <div class="chart-wrap"><canvas id="kuorma-atl-ctl-chart"></canvas></div>
+            <p class="chart-subtitle chart-readguide"><strong>Ohje:</strong> Akuutti (sininen) kertoo viime viikkojen kuorman, krooninen (oranssi) kuukauden pohjatason. Kun sininen kohoaa selvästi oranssin yläpuolelle, harjoittelu on kovempaa kuin pohjakuntoon nähden - riski kasvaa. Kun viivat kulkevat lähekkäin, kuormitus on kestävällä tasolla.</p>
+            <p class="chart-subtitle chart-readguide-goal"><strong>Tavoite:</strong> Nostaa molempia hitaasti yhdessä.</p>
+          </div>
+
+          <!-- ACWR ajan yli -->
+          <div class="chart-section">
+            <p class="chart-title">ACWR kehitys – 12 viikkoa</p>
+            <p class="chart-subtitle">Vihreä vyöhyke 0.8–1.3 = optimi · Keltainen 1.3–1.5 = tarkkaile · Punainen &gt;1.5 = korkea kuorma</p>
+            <div class="chart-wrap"><canvas id="kuorma-acwr-chart"></canvas></div>
+            <p class="chart-subtitle chart-readguide"><strong>Ohje:</strong> ACWR (akuutti / krooninen -suhde) tiivistää saman asian yhteen lukuun. 0,8–1,3 on optimialue - elimistö ehtii palautua. 1,3–1,5 on kohonnut kuorma - seuraa oloasi ja pidä silmällä palautumista. Yli 1,5 on merkittävä kuorma - varmista palautuminen, harkitse treenien keventämistä.</p>
+          </div>
+
+          <!-- Tehoaluejakauma 4 vk -->
+          <div class="chart-section">
+            <p class="chart-title">Tehoaluejakauma – viimeiset 4 viikkoa</p>
+            <div class="pie-charts-row">
+              <div class="pie-chart-wrap">
+                <p class="pie-chart-sub">Minuutit</p>
+                <canvas id="kuorma-zone-chart"></canvas>
+                <div id="kuorma-zone-min-legend" class="pie-legend"></div>
+              </div>
+              <div class="pie-chart-wrap">
+                <p class="pie-chart-sub">Kuormitus (AU)</p>
+                <canvas id="kuorma-zone-load-chart"></canvas>
+                <div id="kuorma-zone-load-legend" class="pie-legend"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tehoaluesanat -->
+          <div class="chart-section kuorma-zones-info">
+            <p class="chart-title">Tehoalueiden kuormituspainot</p>
+            <div class="kuorma-zone-table">
+              <div class="kuorma-zone-row"><div class="kuorma-zone-dot" style="background:#4FC3D0"></div><div><strong>I – Peruskunto / Palauttava</strong><br><span>Syke 50–70 % · Tuntuu liian helpolta – se on tarkoitus. Rakentaa verenkiertoa ja tehostaa palautumista.</span></div><div class="kuorma-zone-badge" style="background:rgba(79,195,208,.15);color:#1A6B75">×1.0</div></div>
+              <div class="kuorma-zone-row"><div class="kuorma-zone-dot" style="background:#7DC83A"></div><div><strong>II – Kestävyys</strong><br><span>Syke 60–80 % · Reipas ja tasainen, hengästyt mutta ei happoja. Siirtää maitohappokynnystä ylöspäin.</span></div><div class="kuorma-zone-badge" style="background:rgba(125,200,58,.15);color:#3A6B10">×2.0</div></div>
+              <div class="kuorma-zone-row"><div class="kuorma-zone-dot" style="background:#F5A623"></div><div><strong>III – Maksimikestävyys</strong><br><span>Syke 80–90 % · Erittäin kovat pitkät vedot (&gt;2 min). Kasvattaa maksimihapenottoa.</span></div><div class="kuorma-zone-badge" style="background:rgba(245,166,35,.15);color:#8A5200">×3.5</div></div>
+              <div class="kuorma-zone-row"><div class="kuorma-zone-dot" style="background:#E84040"></div><div><strong>IV – Nopeuskestävyys</strong><br><span>Syke 90–100 % · Lyhyet maksimi-intervallit 30–60 s. Korkein metabolinen stressi – kehittää kykyä sietää ja poistaa maitohappoja.</span></div><div class="kuorma-zone-badge" style="background:rgba(232,64,64,.15);color:#7A1010">×5.0</div></div>
+              <div class="kuorma-zone-row"><div class="kuorma-zone-dot" style="background:#AAAAAA"></div><div><strong>V – Nopeus</strong><br><span>Syke ei kerkeä nousta · Räjähtävät alle 10 s pyrähdykset + pitkät palautukset. Korkea neuraalinen stressi, alhainen kokonaismetabolia sessioaikaan suhteutettuna.</span></div><div class="kuorma-zone-badge" style="background:rgba(170,170,170,.15);color:#555">×3.0</div></div>
+            </div>
+          </div>
+
+          <!-- Datalaatu -->
+          <div class="chart-section">
+            <p class="chart-title">Datalaatu</p>
+            <div id="kuorma-dq-row" class="kuorma-dq-row"></div>
+            <p class="chart-subtitle" style="margin-top:6px">Kirjaukset ilman tehoaluetta arvioidaan lajin tyypillisen kuormittavuuden mukaan.</p>
+          </div>
+
+        </div><!-- /subtab-kuorma -->
+
       </div>
 
       <!-- Tab: Joukkue -->
       <div id="tab-joukkue" class="tab-content hidden">
-        <div id="joukkue-no-team" class="joukkue-no-team-notice hidden">
-          <div class="joukkue-no-team-icon">👥</div>
-          <p class="joukkue-no-team-title">Et ole vielä missään joukkueessa</p>
-          <p class="joukkue-no-team-desc">Täällä näet joukkuekavereittesi treenit reaaliajassa. Liity joukkueeseen profiilisivultasi ja pidä kaverit motivoituneina!</p>
-          <button type="button" id="joukkue-open-profile-btn" class="btn-primary joukkue-join-btn">Avaa profiili</button>
+        <!-- Ali-tab: Fiidi -->
+        <div id="subtab-fiidi">
+          <div id="joukkue-no-team" class="joukkue-no-team-notice hidden">
+            <div class="joukkue-no-team-icon">👥</div>
+            <p class="joukkue-no-team-title">Et ole vielä missään joukkueessa</p>
+            <p class="joukkue-no-team-desc">Täällä näet joukkuekavereittesi treenit reaaliajassa. Liity joukkueeseen profiilisivultasi ja pidä kaverit motivoituneina!</p>
+            <button type="button" id="joukkue-open-profile-btn" class="btn-primary joukkue-join-btn">Avaa profiili</button>
+          </div>
+          <div class="treenit-toolbar">
+            <span id="joukkue-period-label" class="period-label"></span>
+            <span id="joukkue-cache-ts" class="joukkue-cache-ts" title="Datan ikä"></span>
+            <button id="joukkue-refresh-btn" class="refresh-btn" title="Päivitä joukkueen treenit" aria-label="Päivitä">↻</button>
+          </div>
+          <div id="joukkue-feed" class="joukkue-feed"></div>
         </div>
-        <div class="treenit-toolbar">
-          <span id="joukkue-period-label" class="period-label"></span>
-          <span id="joukkue-cache-ts" class="joukkue-cache-ts" title="Datan ikä"></span>
-          <button id="joukkue-refresh-btn" class="refresh-btn" title="Päivitä joukkueen treenit" aria-label="Päivitä">↻</button>
+        <!-- Ali-tab: Tapahtumat -->
+        <div id="subtab-tapahtumat" class="hidden">
+          <div id="tapahtumat-content" class="tapahtumat-content"></div>
         </div>
-        <div id="joukkue-feed" class="joukkue-feed"></div>
+        <!-- Ali-tab: Viikko-Ohje (vain admin) -->
+        <div id="subtab-viikkoohje" class="hidden">
+          <div id="viikkoohje-content" class="viikkoohje-content"></div>
+        </div>
       </div>
 
     </main>
@@ -262,7 +401,7 @@
           <h3 class="admin-section-title">🏟️ Joukkueet</h3>
           <div id="admin-teams-list"></div>
           <div class="admin-csv-row" style="margin-top:0.75rem">
-            <input type="text" id="admin-new-team-input" class="admin-input" placeholder="Uuden joukkueen nimi" style="flex:1">
+            <input type="text" id="admin-new-team-input" class="admin-input" placeholder="Uuden joukkueen nimi" style="flex:1" autocomplete="off">
             <button class="btn-primary admin-csv-btn" onclick="adminAddTeam()">Lisää</button>
           </div>
         </div>
@@ -359,7 +498,13 @@
         </div>
 
         <div class="form-group">
-          <label>Kommentti <span class="label-optional">(valinnainen)</span></label>
+          <div class="comment-label-row">
+            <label>Kommentti <span class="label-optional">(valinnainen)</span></label>
+            <label class="toggle-label">
+              <input type="checkbox" id="entry-private-comment">
+              Yksityinen
+            </label>
+          </div>
           <textarea id="entry-comment" rows="3" placeholder="Muistiinpanoja harjoituksesta…" maxlength="500"></textarea>
           <p class="char-counter"><span id="comment-char-count">0</span>/500</p>
         </div>
@@ -386,7 +531,7 @@
 
         <div class="form-actions">
           <button type="button" id="delete-entry-btn" class="btn-danger hidden">Poista</button>
-          <button type="submit" class="btn-primary">Tallenna</button>
+          <button type="submit" id="entry-save-btn" class="btn-primary">Tallenna</button>
         </div>
 
       </form>
@@ -408,6 +553,93 @@
   </div>
 
   <!-- Zone Picker Bottom Sheet (viikkosuunnitelma) -->
+  <!-- Kalenterin tooltip -->
+  <div id="cal-tooltip" class="cal-tooltip hidden" role="tooltip">
+    <div id="cal-tooltip-content"></div>
+  </div>
+
+  <!-- Testit: lisää testi -sheet -->
+  <div id="testit-sheet-backdrop" class="sheet-backdrop hidden"></div>
+  <div id="testit-sheet" class="bottom-sheet bottom-sheet--tall hidden" role="dialog" aria-modal="true" aria-label="Lisää kuntotesti">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span id="testit-sheet-title" class="sheet-title">Uusi kuntotesti</span>
+      <button id="testit-sheet-close" class="sheet-close" aria-label="Sulje">✕</button>
+    </div>
+    <div class="testit-form-body">
+      <div class="testit-date-row">
+        <label class="testit-date-label">Päivämäärä</label>
+        <input type="date" id="testit-date" class="admin-input testit-date-input">
+      </div>
+      <div class="testit-grid-header">
+        <span>#</span><span>Aika (s)</span><span>Syke 1</span><span>Syke 2 30s</span><span>Virhe</span>
+      </div>
+      <div id="testit-rows"></div>
+      <button id="testit-save-btn" class="btn-primary testit-save-btn">Tallenna testi</button>
+    </div>
+  </div>
+
+  <div id="maxnopeus-sheet-backdrop" class="sheet-backdrop hidden"></div>
+  <div id="maxnopeus-sheet" class="bottom-sheet hidden" role="dialog" aria-modal="true" aria-label="Lisää max nopeus tulos">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span id="maxnopeus-sheet-title" class="sheet-title">Uusi tulos</span>
+      <button id="maxnopeus-sheet-close" class="sheet-close" aria-label="Sulje">✕</button>
+    </div>
+    <div class="testit-form-body">
+      <div class="testit-date-row">
+        <label class="testit-date-label">Päivämäärä</label>
+        <input type="date" id="maxnopeus-date" class="admin-input testit-date-input">
+      </div>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Aika (sekuntia)</label>
+        <input type="number" id="maxnopeus-time" class="admin-input testit-date-input" step="0.1" min="0" placeholder="esim. 12.5">
+      </div>
+      <button id="maxnopeus-save-btn" class="btn-primary testit-save-btn">Tallenna tulos</button>
+    </div>
+  </div>
+
+  <div id="lihas-sheet-backdrop" class="sheet-backdrop hidden"></div>
+  <div id="lihas-sheet" class="bottom-sheet bottom-sheet--tall hidden" role="dialog" aria-modal="true" aria-label="Lisää lihaskuntotesti">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span id="lihas-sheet-title" class="sheet-title">Uusi lihaskuntotesti</span>
+      <button id="lihas-sheet-close" class="sheet-close" aria-label="Sulje">✕</button>
+    </div>
+    <div class="testit-form-body">
+      <div class="testit-date-row">
+        <label class="testit-date-label">Päivämäärä</label>
+        <input type="date" id="lihas-date" class="admin-input testit-date-input">
+      </div>
+      <p class="testit-sub-desc" style="margin:0.75rem 0 0.25rem">Tulokset (tyhjä = ei mitattu)</p>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Toes to Bar</label>
+        <input type="number" id="lihas-toesToBar" class="admin-input testit-date-input" min="0" placeholder="toistoa">
+      </div>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Knees to Chest</label>
+        <input type="number" id="lihas-kneesToChest" class="admin-input testit-date-input" min="0" placeholder="toistoa">
+      </div>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Leuanveto</label>
+        <input type="number" id="lihas-leuanveto" class="admin-input testit-date-input" min="0" placeholder="toistoa">
+      </div>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Vauhditon pituushyppy</label>
+        <input type="number" id="lihas-pituushyppy" class="admin-input testit-date-input" min="0" placeholder="cm">
+      </div>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Punnerrus</label>
+        <input type="number" id="lihas-punnerrus" class="admin-input testit-date-input" min="0" placeholder="toistoa">
+      </div>
+      <div class="testit-date-row">
+        <label class="testit-date-label">Punnerrus polvet maassa</label>
+        <input type="number" id="lihas-punnerrusPolvetMaassa" class="admin-input testit-date-input" min="0" placeholder="toistoa">
+      </div>
+      <button id="lihas-save-btn" class="btn-primary testit-save-btn">Tallenna testi</button>
+    </div>
+  </div>
+
   <div id="zone-picker-backdrop" class="sheet-backdrop hidden"></div>
   <div id="zone-picker-sheet" class="bottom-sheet hidden" role="dialog" aria-modal="true" aria-label="Valitse tehoalue">
     <div class="sheet-handle"></div>
@@ -426,9 +658,20 @@
     <div class="modal-backdrop" id="profile-backdrop"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Profiili</h2>
+        <h2 id="profile-modal-title">Profiili</h2>
         <button id="close-profile" aria-label="Sulje">✕</button>
       </div>
+
+      <!-- Portaalivälilehdet -->
+      <nav class="profile-portal-tabs">
+        <button class="profile-portal-tab active" data-profile-tab="tiedot">Tiedot</button>
+        <button class="profile-portal-tab" data-profile-tab="tavoitteet">Tavoitteet</button>
+        <button class="profile-portal-tab" data-profile-tab="testit">Testit</button>
+        <button class="profile-portal-tab" data-profile-tab="ennatykset">Saavutukset</button>
+      </nav>
+
+      <!-- Välilehti: Tiedot -->
+      <div id="profile-tab-tiedot" class="profile-portal-panel">
       <form id="profile-form" novalidate>
 
         <div class="profile-section-label">Henkilötiedot</div>
@@ -501,6 +744,14 @@
           </label>
         </div>
 
+        <div class="form-group">
+          <label>AI Coach</label>
+          <label class="team-checkbox-item">
+            <input type="checkbox" id="profile-aicoach-enabled">
+            <span>Ota AI Coach käyttöön</span>
+          </label>
+        </div>
+
         <div class="form-actions">
           <button type="submit" class="btn-primary">Tallenna</button>
         </div>
@@ -525,7 +776,75 @@
         </div>
 
         <button id="logout-btn" class="btn-primary">Kirjaudu ulos</button>
+        <button id="export-data-btn" class="btn-primary">Lataa Harjoitteludata</button>
         <button id="delete-own-account-btn" class="btn-danger-outline">Poista oma tili ja kaikki tiedot</button>
+      </div>
+      </div><!-- /profile-tab-tiedot -->
+
+      <!-- Välilehti: Testit -->
+      <div id="profile-tab-testit" class="profile-portal-panel hidden">
+        <nav class="testit-sub-tabs">
+          <button class="testit-sub-tab active" data-testit-tab="rapyla">10 × 100m</button>
+          <button class="testit-sub-tab" data-testit-tab="lihaskunto">Lihaskunto</button>
+          <button class="testit-sub-tab" data-testit-tab="maxnopeus">Max Nopeus</button>
+        </nav>
+        <div id="testit-sub-rapyla" class="testit-sub-panel">
+          <div id="testit-container">
+            <div class="profile-coming-soon">
+              <div class="profile-coming-soon-icon">⏳</div>
+              <p class="profile-coming-soon-desc">Ladataan…</p>
+            </div>
+          </div>
+        </div>
+        <div id="testit-sub-lihaskunto" class="testit-sub-panel hidden">
+          <div id="lihaskunto-container"></div>
+        </div>
+        <div id="testit-sub-maxnopeus" class="testit-sub-panel hidden">
+          <div id="maxnopeus-container">
+            <div class="profile-coming-soon">
+              <div class="profile-coming-soon-icon">⏳</div>
+              <p class="profile-coming-soon-desc">Ladataan…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Välilehti: Ennätykset -->
+      <div id="profile-tab-ennatykset" class="profile-portal-panel hidden">
+        <div id="ennatykset-container">
+          <div class="profile-coming-soon">
+            <div class="profile-coming-soon-icon">⏳</div>
+            <p class="profile-coming-soon-desc">Ladataan…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Välilehti: Tavoitteet -->
+      <div id="profile-tab-tavoitteet" class="profile-portal-panel hidden">
+        <div class="tavoite-form">
+          <div class="profile-section-label" style="border-top:none;padding-top:0.25rem">Viikottaiset tavoitteet</div>
+
+          <div class="form-group">
+            <label>Minuutit / viikko <span class="label-optional">(valinnainen)</span></label>
+            <div class="tavoite-input-row">
+              <input type="number" id="goal-weekly-minutes" placeholder="esim. 120" min="0" max="9999">
+              <span class="tavoite-unit">min</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Treenikerrat / viikko <span class="label-optional">(valinnainen)</span></label>
+            <div class="tavoite-input-row">
+              <input type="number" id="goal-weekly-sessions" placeholder="esim. 4" min="0" max="99">
+              <span class="tavoite-unit">krt</span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="save-goals-btn" class="btn-primary">Tallenna tavoitteet</button>
+          </div>
+          <p id="goals-save-status" class="goals-save-status hidden"></p>
+        </div>
       </div>
 
     </div>
@@ -573,15 +892,21 @@
     <div class="modal-backdrop" id="help-backdrop"></div>
     <div class="modal-content help-modal-content">
       <div class="modal-header">
-        <h2>Käyttöohje</h2>
-        <button id="close-help" aria-label="Sulje">✕</button>
+        <h2>Ohje</h2>
+        <button id="close-help" class="modal-close" aria-label="Sulje">✕</button>
       </div>
+      <nav class="help-tab-nav">
+        <button class="help-tab-btn active" data-help-tab="kaytto">Käyttöohje</button>
+        <button class="help-tab-btn" data-help-tab="tietoturva">Tietoturva</button>
+        <button class="help-tab-btn" data-help-tab="versiot">Versiot</button>
+      </nav>
+
+      <!-- Välilehti: Käyttöohje -->
+      <div id="help-tab-kaytto" class="help-body">
       <div class="help-version-bar">
-        <span class="help-version" id="help-version-text">Versio 1.0</span>
+        <span class="help-version" id="help-version-text">Versio 1.7</span>
         <span class="help-updated" id="help-updated-text">Päivitetty…</span>
       </div>
-
-      <div class="help-body">
 
         <section class="help-section">
           <h3>📋 Yleistä</h3>
@@ -623,8 +948,9 @@
           <ul>
             <li>Kolme päävälilehteä: <strong>Treenit</strong>, <strong>Trendit</strong> ja <strong>Joukkue</strong></li>
             <li>Vaihda välilehteä napauttamalla tai <strong>pyyhkäisemällä vasemmalle / oikealle</strong></li>
-            <li><strong>Treenit</strong>-välilehdellä alavalikot <strong>Loki</strong> ja <strong>Kalenteri</strong></li>
-            <li><strong>Trendit</strong>-välilehdellä alavalikot <strong>Omat</strong> ja <strong>Vertailu</strong></li>
+            <li><strong>Treenit</strong> — alavalikot <strong>Loki</strong> ja <strong>Kalenteri</strong> (sekä <strong>AI Coach</strong> jos otettu käyttöön)</li>
+            <li><strong>Trendit</strong> — alavalikot <strong>Omat</strong>, <strong>Vertailu</strong> ja <strong>Kuorma</strong></li>
+            <li><strong>Joukkue</strong> — alavalikot <strong>Fiidi</strong> ja <strong>Tapahtumat</strong></li>
           </ul>
         </section>
 
@@ -639,6 +965,16 @@
             <li>Valinnaisia: matka (km), keskisyke, maksimisyke ja kommentti</li>
             <li>Tallenna painamalla <strong>Tallenna</strong></li>
             <li>Muokkaa tai poista treeniä napauttamalla korttia listassa</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>📋 Treenihistoria (Loki)</h3>
+          <ul>
+            <li>Loki näyttää oletuksena kuluvan viikon ja kolme edellistä viikkoa</li>
+            <li>Jokaisen päättyneen viikon yläpuolella näkyy <strong>viikkoyhteenveto</strong> — treenikerrat, kokonaisminuutit ja tehoaluejakauma</li>
+            <li>Kuluvalle viikolle näytetään lisäksi tavoiterenkaat (jos tavoitteet on asetettu)</li>
+            <li>Vanhempia treenejä lataat painamalla <strong>Lataa 2 viikkoa lisää</strong> -nappia listan lopussa</li>
           </ul>
         </section>
 
@@ -658,7 +994,9 @@
           <p>Kalenteri-alivalikko (Treenit → Kalenteri) näyttää harjoittelun kuukausittaisena ruudukkokalenterina.</p>
           <ul>
             <li>Päivän solu värjätään <strong>kovimman tehoalueen värin mukaan</strong> — harmaa on I, turkoosi II, vihreä III, oranssi IV, punainen V</li>
-            <li>Tämän päivän päivämäärä korostetaan kehysviivalla</li>
+            <li>Tämän päivän päivämäärä korostetaan sinisellä taustavärillä</li>
+            <li><strong>Napauta päivää</strong> — tooltip näyttää treenin lajin, tehoalueen ja minuutit</li>
+            <li>Maajoukkueen tapahtumat näkyvät <strong>violettina pisteenä</strong> päivänumeron edessä — tooltip näyttää tapahtuman nimen ja ajankohdan</li>
             <li>Kalenteri latautuu automaattisesti lisää vieritettäessä alaspäin (enintään 2 vuotta taaksepäin)</li>
             <li>Viikkonumero näkyy jokaisen viikon vasemmassa reunassa</li>
           </ul>
@@ -670,11 +1008,34 @@
           <ul>
             <li><strong>Omat</strong> — viikkokohtaiset kaaviot omasta harjoittelustasi: kesto tehoalueittain ja fiilis 12 viikon ajalta. Suodata haluamasi tehoalue napeista.</li>
             <li><strong>Vertailu</strong> — oma harjoittelusi verrattuna joukkueen keskiarvoon. Valitse mittari (minuutit / sessiot) ja suodata tehoalueittain.</li>
+            <li><strong>Kuorma</strong> — harjoituskuorman seuranta (ks. alla).</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🩺 Kuorma (harjoituskuorma)</h3>
+          <p>Kuorma-alivalikko arvioi harjoittelun kuormittavuutta ja palautumistarvetta. Luvut ovat suuntaa-antavia — kuormittavuuteen vaikuttavat myös uni, ravitsemus ja stressi.</p>
+          <ul>
+            <li><strong>Harjoituskuorma nyt</strong> — mittari näyttää <strong>ACWR</strong>-luvun (akuutti/krooninen-suhde). 0,8–1,3 on optimivyöhyke (vihreä), 1,3–1,5 kohonnut (keltainen), yli 1,5 merkittävä (punainen), alle 0,8 kevyt jakso (sininen).</li>
+            <li><strong>Akuutti vs krooninen kuorma</strong> — sininen (viime viikot) ja oranssi (kuukauden pohjataso) 12 viikon ajalta. Tavoite: nostaa molempia hitaasti yhdessä.</li>
+            <li><strong>ACWR kehitys</strong> — suhdeluvun kehitys vyöhykeväreineen.</li>
+            <li><strong>Tehoaluejakauma</strong> — viimeisten 4 viikon minuutit ja kuormitus (AU) tehoalueittain.</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🤖 AI Coach</h3>
+          <p>AI Coach antaa AI-valmentajan analyysin harjoittelustasi. Ota se käyttöön profiilin <em>Tiedot</em>-välilehdellä kohdasta <strong>Ota AI Coach käyttöön</strong> — välilehti ilmestyy tällöin Treenit-riviin Kalenterin viereen.</p>
+          <ul>
+            <li>Analysoi muistissa olevat treenisi (enintään 12 viikkoa) ja huomioi uppopallo/oheis-suhteen, tehoalueet, fiiliksen ja kuorman.</li>
+            <li>Analyysi tehdään automaattisesti, jos edellisestä on yli viikko. Voit ajaa sen milloin vain <strong>↻ Analysoi uudelleen</strong> -napista.</li>
+            <li>AI voi tehdä virheitä — jos jokin mietityttää, juttele mieluummin oman valmentajasi kanssa.</li>
           </ul>
         </section>
 
         <section class="help-section">
           <h3>👥 Joukkue-välilehti</h3>
+          <p><strong>Fiidi</strong></p>
           <ul>
             <li>Reaaliaikainen virta joukkuekavereittesi viimeisimmistä treeneistä</li>
             <li>Jokaisen kortin vasemmassa reunassa <strong>tehoalueen väri</strong></li>
@@ -682,18 +1043,41 @@
             <li>Syöte latautuu automaattisesti lisää vieritettäessä alaspäin</li>
             <li>Liity joukkueeseen profiilisivullasi</li>
           </ul>
+          <p style="margin-top:0.75rem"><strong>Tapahtumat</strong></p>
+          <ul>
+            <li>Listaus Naisten Maajoukkueen tulevista ja menneistä tapahtumista</li>
+            <li>Päivämäärä, tapahtuman nimi ja paikka — linkit uutisiin merkittävistä tapahtumista</li>
+          </ul>
         </section>
 
         <section class="help-section">
           <h3>👤 Profiili</h3>
+          <p>Avaa profiili napauttamalla <strong>avataria</strong> oikeassa yläkulmassa. Profiilissa on neljä välilehteä:</p>
+          <p style="margin-top:0.5rem"><strong>Tiedot</strong></p>
           <ul>
-            <li>Avaa profiili napauttamalla <strong>avataria</strong> oikeassa yläkulmassa</li>
-            <li>Aseta <strong>nimimerkki</strong>, etunimi, sukunimi ja syntymäaika</li>
-            <li>Lataa <strong>profiilikuva</strong> (näkyy joukkueen syötteessä)</li>
-            <li>Valitse <strong>joukkue tai joukkueet</strong> (monivalinta)</li>
-            <li>Hallitse näkyvyyttä: <em>Jaa aktiviteetit</em> ja <em>Jaa kommentit</em> — kommenttien jako aktivoituu vasta kun aktiviteettien jako on päällä</li>
-            <li>Salasanan vaihto löytyy profiilisivun alaosasta</li>
+            <li>Aseta nimimerkki, etunimi, sukunimi ja syntymäaika</li>
+            <li>Lataa profiilikuva (näkyy joukkueen syötteessä)</li>
+            <li>Valitse joukkue tai joukkueet (monivalinta)</li>
+            <li>Hallitse näkyvyyttä: <em>Jaa aktiviteetit</em> ja <em>Jaa kommentit</em></li>
+            <li><strong>Ota AI Coach käyttöön</strong> — näyttää AI Coach -välilehden Treenit-rivillä</li>
+            <li>Salasanan vaihto löytyy sivun alaosasta</li>
+            <li><strong>Lataa Harjoitteludata</strong> — lataa kaikki omat treenisi CSV-tiedostona (Excel-yhteensopiva)</li>
           </ul>
+          <p style="margin-top:0.75rem"><strong>Testit</strong></p>
+          <ul>
+            <li><strong>10×100m</strong> — räpyläpotkutesti (lähtö 2 min, Syke 1 heti, Syke 2 tauko 30 s). Näyttää aikakaavion ja sykekaavion kaikista testeistä viivat limittäin; väri vaihettuu vanhimmasta (vaalea) uusimpaan (tumma sininen). Lisää uusi testi tai poista vanhoja.</li>
+            <li><strong>Max Nopeus</strong> — 25m sukellus max-nopeudella. Aikakaavio edistymisestä (sekuntia, pienempi on parempi). Lisää tai poista tuloksia.</li>
+            <li><strong>Lihaskunto</strong> — kehonpainoliikkeiden seurantasivu. Liikkeet: Toes to Bar, Knees to Chest, Leuanveto, Vauhditon pituushyppy, Punnerrus ja Punnerrus polvet maassa. Jokaisesta liikkeestä kaavio oman kehityksen seuraamiseen — oranssi pisteviiva näyttää joukkueen parhaan tuloksen vertailuarvona. Lisää uusi testi tai poista vanhoja.</li>
+          </ul>
+          <p style="margin-top:0.75rem"><strong>Saavutukset</strong></p>
+          <ul>
+            <li>📊 <strong>Treenihistoria</strong> — yhteensä kirjatut treenimäärä ja -minuutit sekä ensimmäisen treenin päivämäärä</li>
+            <li>🤿 Eniten uppopalloa viikossa (min)</li>
+            <li>🏅 Eniten treenejä viikossa</li>
+            <li>⏱ Eniten treeniminuutteja viikossa</li>
+            <li>🕐 Pisin yksittäinen treeni</li>
+          </ul>
+          <p style="margin-top:0.75rem"><strong>Tavoitteet</strong> — aseta omat harjoitustavoitteet</p>
         </section>
 
         <section class="help-section">
@@ -703,6 +1087,7 @@
           <ul>
             <li><strong>Aktiivisuus</strong> — oman joukkueen harjoitusaktiivisuus 12 viikon ajalta pelaajittain</li>
             <li><strong>CSV</strong> — lataa koko joukkueen tai yksittäisen pelaajan harjoitusdata taulukkolaskentaan</li>
+            <li><strong>In-personointi</strong> — käyttäjälistasta voi avata pelaajan näkymän (treenit, testit, saavutukset) ilman kirjautumistietojen vaihtoa. Yläpalkkiin ilmestyy pelaajan avatar ja <em>Lopeta</em>-nappi.</li>
           </ul>
           <p style="margin-top:0.5rem"><strong>Ylläpitäjä</strong> näkee lisäksi:</p>
           <ul>
@@ -716,10 +1101,66 @@
           <p>Kirjautumissivulla: kirjoita sähköposti ja paina <strong>Unohditko salasanan?</strong> — palautuslinkki lähetetään sähköpostiisi.</p>
         </section>
 
-        <hr class="help-divider">
+      </div><!-- /help-tab-kaytto -->
 
+      <!-- Välilehti: Versiohistoria -->
+      <div id="help-tab-versiot" class="help-body hidden">
         <section class="help-section help-history">
           <h3>📝 Versiohistoria</h3>
+
+          <div class="history-entry">
+            <span class="history-version">v1.7</span>
+            <span class="history-date">1.6.2026</span>
+            <ul>
+              <li><strong>AI Coach</strong> — AI-valmentajan analyysi treeneistä (uppopallo/oheis-suhde, tehoalueet, fiilis, kuorma). Otetaan käyttöön profiilista; oma välilehti Treenit-rivillä.</li>
+              <li><strong>Kuorma-välilehti kaikille</strong> — harjoituskuorman (ACWR) seuranta: kuormamittari, akuutti vs krooninen, ACWR-kehitys ja tehoaluejakauma</li>
+              <li><strong>Päivityspalkki</strong> — "Uusi versio saatavilla – Päivitä" ilmestyy kun uusi versio on ladattavissa (ei enää manuaalista välimuistin tyhjennystä)</li>
+              <li>Tehoaluejakauma näyttää sekä minuutit että kuormituksen (AU)</li>
+              <li>Neljäs splash-kuva kirjautumisnäytölle</li>
+              <li>Tietoturva- ja vakauskorjauksia: in-personoinnin välimuisti ei sekoita omaa dataa, hallintapaneelin toiminnot turvallisemmin</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v1.6</span>
+            <span class="history-date">22.5.2026</span>
+            <ul>
+              <li><strong>Lihaskunto-testi</strong> — kaaviot kuudelle liikkeelle (Toes to Bar, Knees to Chest, Leuanveto, Vauhditon pituushyppy, Punnerrus, Punnerrus polvet maassa). Joukkueen paras tulos oranssina referenssiviivana, Y-akseli skaalattu joukkueen tulosten mukaan.</li>
+              <li><strong>Viikkoyhteenvetokortit lokiin</strong> — jokaisen päättyneen viikon yläpuolella näkyy tiivistelmä treenimääristä ja tehoaluejakaumasta</li>
+              <li><strong>Loki latautuu 2 viikkoa kerrallaan</strong> vanhempia treenejä ladattaessa (aiempi 4 vk)</li>
+              <li><strong>Lataa Harjoitteludata</strong> -nappi profiiliin — vie kaikki treenit CSV-muodossa</li>
+              <li>Uudet lajit lajilistaan: Rullaluistelu, Kajakointi, Sauvakävely, Surffaus</li>
+              <li>Bugikorjaus: vanhat treenit latautuivat lokissa vain 14.4. asti — nyt kaikki historia on saavutettavissa</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v1.5</span>
+            <span class="history-date">7.5.2026</span>
+            <ul>
+              <li>Ohje-modaaliin kolme välilehteä: <strong>Käyttöohje</strong>, <strong>Tietoturva</strong> ja <strong>Versiot</strong></li>
+              <li>Profiilin "Ennätykset"-välilehti nimetty <strong>Saavutukset</strong></li>
+              <li>Saavutukset: uusi <strong>Treenihistoria</strong>-kortti — treenimäärä, treeniminuutit ja ensimmäisen treenin päivämäärä</li>
+              <li><strong>In-personointi</strong>: valmentaja/ylläpitäjä voi tarkastella pelaajan profiilia, testejä ja saavutuksia suoraan hallintapaneelista</li>
+              <li>In-personointitilassa pelaajan avatar näkyy yläpalkissa — tilasta poistuu Lopeta-napilla tai ⚙-ikonista</li>
+              <li>Bugikorjauksia: tavoitteiden tallennus ei enää ylikirjoita muita profiilitietoja, valmentajatieto säilyy profiilin tallennuksessa</li>
+            </ul>
+          </div>
+
+          <div class="history-entry">
+            <span class="history-version">v1.4</span>
+            <span class="history-date">29.4.2026</span>
+            <ul>
+              <li>Joukkue-välilehteen alavalikot: <strong>Fiidi</strong> ja <strong>Tapahtumat</strong></li>
+              <li>Tapahtumat-lista Naisten Maajoukkueen tulevista ja menneistä tapahtumista linkkeineen</li>
+              <li>Kalenteriin napauttamalla tooltip: laji, tehoalue ja minuutit</li>
+              <li>Maajoukkueen tapahtumat kalenterissa violettina pisteenä päivänumeron edessä</li>
+              <li>Profiili – Testit: 10×100m räpyläpotkutesti — aikakaavio + sykekaavio, lisäys ja poisto</li>
+              <li>Profiili – Testit: Max Nopeus (25m) — aikakaavio, lisäys ja poisto</li>
+              <li>Profiili – Ennätykset: uusi ennätys 🤿 Eniten uppopalloa viikossa</li>
+              <li>Ennätysten emojit tasattu ja teksti samalle pystylinjalle</li>
+            </ul>
+          </div>
 
           <div class="history-entry">
             <span class="history-version">v1.3</span>
@@ -802,7 +1243,71 @@
           </div>
 
         </section>
-      </div>
+      </div><!-- /help-tab-versiot -->
+
+      <!-- Välilehti: Tietoturva -->
+      <div id="help-tab-tietoturva" class="help-body hidden">
+
+        <section class="help-section">
+          <h3>🔐 Salasana</h3>
+          <ul>
+            <li>Käytä <strong>vahvaa, yksilöllistä salasanaa</strong> — vähintään 12 merkkiä, kirjaimia, numeroita ja erikoismerkkejä</li>
+            <li><strong>Älä käytä samaa salasanaa</strong> muissa palveluissa</li>
+            <li>Salasananhallintaohjelma (esim. 1Password, Bitwarden, Apple Keychain) on helpoin tapa hallita vahvoja salasanoja</li>
+            <li>Vaihda salasana heti, jos epäilet että se on joutunut vääriin käsiin</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>📱 Laiteturvallisuus</h3>
+          <ul>
+            <li>Asenna sovellus vain omalle laitteellesi — <strong>älä kirjaudu sisään jaetulla tai julkisella laitteella</strong></li>
+            <li>Pidä puhelimesi käyttöjärjestelmä ja selain ajan tasalla</li>
+            <li>Suojaa puhelimesi PIN-koodilla, sormenjäljellä tai kasvojentunnistuksella</li>
+            <li>Jos menetät laitteen, vaihda salasanasi heti toiselta laitteelta</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🔑 Kirjautuminen</h3>
+          <ul>
+            <li><strong>Älä jaa kirjautumistietojasi</strong> kenellekään — edes joukkuetovereille tai valmentajalle</li>
+            <li>Kirjaudu ulos tililtäsi aina, kun käytät sovellusta jaetulla laitteella</li>
+            <li>Kirjautuminen tapahtuu <strong>Firebase Authentication</strong> -palvelun kautta — salasanasi ei koskaan tallennu sovelluksen tietokantaan eikä ylläpitäjä näe sitä</li>
+            <li>Unohtunut salasana palautetaan sähköpostilinkin kautta — tarkista aina että osoite on <strong>uwrdiary.web.app</strong></li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🛡 Yksityisyys ja näkyvyys</h3>
+          <ul>
+            <li>Profiilissasi voit hallita mitä tietoja jaetaan joukkueelle: <strong>Jaa aktiviteetit</strong> ja <strong>Jaa kommentit</strong></li>
+            <li>Jos <em>Jaa aktiviteetit</em> on pois päältä, treenisi eivät näy joukkueen syötteessä kenellekään</li>
+            <li>Yksittäinen kommentti voidaan merkitä <strong>Yksityinen</strong>, jolloin se ei näy fiidissä vaikka kommenttien jakaminen olisi päällä</li>
+            <li>Profiilikuvasi ja nimimerkkisi näkyvät muille joukkueen jäsenille</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>⚠️ Epäilyttävä toiminta</h3>
+          <ul>
+            <li>Jos huomaat tilillesi kirjautuneita treenejä joita et ole lisännyt, <strong>vaihda salasana välittömästi</strong></li>
+            <li>Jos et pysty kirjautumaan sisään vaikka salasana on oikea, ota yhteyttä ylläpitäjään</li>
+            <li>Älä klikkaa epäilyttäviä linkkejä sähköpostissa tai viesteissä jotka väittävät olevansa UWR Diarylta — virallinen osoite on aina <strong>uwrdiary.web.app</strong></li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>📋 Tietoja palvelusta</h3>
+          <ul>
+            <li>Sovellus käyttää <strong>Google Firebase</strong> -alustaa (Auth + Firestore) — tiedot tallennetaan EU:n alueen palvelimille</li>
+            <li>Harjoitustietosi ovat vain sinun ja valitsemiesi joukkueen jäsenten nähtävillä</li>
+            <li>Ylläpitäjällä on pääsy käyttäjälistaan ja harjoitusdataan sovelluksen ylläpitoa varten</li>
+          </ul>
+        </section>
+
+      </div><!-- /help-tab-tietoturva -->
+
     </div>
   </div>
 
@@ -864,25 +1369,102 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="js/config.js?v=9"></script>
-  <script src="js/state.js?v=3"></script>
+  <script src="js/config.js?v=15"></script>
+  <script src="js/state.js?v=4"></script>
   <script src="js/cache.js?v=2"></script>
-  <script src="js/utils.js?v=4"></script>
-  <script src="js/entries.js?v=8"></script>
-  <script src="js/charts.js?v=6"></script>
-  <script src="js/profile.js?v=10"></script>
-  <script src="js/joukkue.js?v=9"></script>
-  <script src="js/calendar.js?v=10"></script>
-  <script src="js/admin.js?v=28"></script>
-  <script src="js/auth.js?v=3"></script>
-  <script src="js/app.js?v=10"></script>
+  <script src="js/utils.js?v=5"></script>
+  <script src="js/records.js?v=1"></script>
+  <script src="js/entries.js?v=40"></script>
+  <script src="js/charts.js?v=30"></script>
+  <script src="js/profile.js?v=65"></script>
+  <script src="js/joukkue.js?v=14"></script>
+  <script src="js/calendar.js?v=38"></script>
+  <script src="js/admin.js?v=49"></script>
+  <script src="js/aicoach.js?v=8"></script>
+  <script src="js/auth.js?v=21"></script>
+  <script src="js/app.js?v=19"></script>
 
-  <!-- PWA: Service Worker registration -->
+  <!-- AI Coach: Firebase AI Logic (Gemini Developer API) — modulaarinen SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-ai.js";
+
+    // Sama (julkinen) config kuin config.js — modulaarinen SDK on oma instanssinsa.
+    const aiConfig = {
+      apiKey: "AIzaSyAAMnqhZq682004Ts0RaYxGLY-v54qj3UI",
+      authDomain: "uwrdiary.firebaseapp.com",
+      projectId: "uwrdiary",
+      storageBucket: "uwrdiary.firebasestorage.app",
+      messagingSenderId: "1099287377245",
+      appId: "1:1099287377245:web:ff2bf47483449b547aa4b4"
+    };
+
+    let model = null;
+    try {
+      const aiApp = initializeApp(aiConfig, 'aicoach');
+      const ai    = getAI(aiApp, { backend: new GoogleAIBackend() });
+      model = getGenerativeModel(ai, { model: 'gemini-2.5-flash' });
+    } catch (e) {
+      console.error('AI Coach init:', e);
+    }
+
+    window.geminiGenerate = async (prompt) => {
+      if (!model) throw new Error('AI-mallia ei alustettu (tarkista Firebase AI Logic -asetukset)');
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    };
+  </script>
+
+  <!-- PWA: päivityspalkki -->
+  <div id="update-banner" class="update-banner hidden">
+    <span>Uusi versio saatavilla</span>
+    <button id="update-banner-btn" type="button">Päivitä</button>
+  </div>
+
+  <!-- PWA: Service Worker registration + controlled update -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .catch(err => console.warn('SW registration failed:', err));
+      let userTriggeredUpdate = false;
+
+      // Lataa sivu uudelleen vasta kun KÄYTTÄJÄ on hyväksynyt päivityksen
+      // (ei ensiasennuksen clients.claim()-tapahtumassa → ei turhaa reloadia).
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (userTriggeredUpdate) window.location.reload();
+      });
+
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('/sw.js');
+
+          const showUpdateBar = () => el('update-banner')?.classList.remove('hidden');
+
+          // Jo odottava worker (asennettu aiemmalla käynnillä)?
+          if (reg.waiting && navigator.serviceWorker.controller) showUpdateBar();
+
+          // Uusi worker asentuu → näytä palkki kun se on valmis odottamaan
+          reg.addEventListener('updatefound', () => {
+            const nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', () => {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBar();
+            });
+          });
+
+          // "Päivitä" → käske odottavaa workeria ottamaan ohjat
+          el('update-banner-btn')?.addEventListener('click', () => {
+            userTriggeredUpdate = true;
+            el('update-banner-btn').disabled = true;
+            if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            else window.location.reload();
+          });
+
+          // Tarkista päivitys kun PWA palaa näkyviin (pysyy auki pitkään)
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) reg.update().catch(() => {});
+          });
+        } catch (err) {
+          console.warn('SW registration failed:', err);
+        }
       });
     }
   </script>

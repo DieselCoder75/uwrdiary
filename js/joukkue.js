@@ -3,9 +3,10 @@
 // ============================================================
 
 // Current user's own reactions: { "ownerUid_entryId": emoji }
-// Loaded fresh from users/{currentUid}.myReactions on each feed render.
+// Loaded once per session from users/{currentUid}.myReactions; force=true clears it.
 // This avoids writing to other users' entry documents entirely.
 let myGlobalReactions = {};
+let myGlobalReactionsLoaded = false;
 
 // Same sort logic as sortEntries but for plain entry objects
 function sortFeedItems(items) {
@@ -74,7 +75,7 @@ function joukkueFeedItemHtml(item, myReaction, avatarCache) {
             <span class="extra-col2">${entry.avgHr != null ? `❤️ ${entry.avgHr} bpm` : ''}</span>
             <span class="extra-col3">${entry.maxHr != null ? `🔺 ${entry.maxHr} bpm` : ''}</span>` : ''}
           </div>
-          ${entry.comment && profile.shareComments ? `<div class="entry-comment">${escapeHtml(entry.comment)}</div>` : ''}
+          ${entry.comment && profile.shareComments && !entry.privateComment ? `<div class="entry-comment">${escapeHtml(entry.comment)}</div>` : ''}
         </div>
         <div class="joukkue-reactions">${reactionBtns}</div>
       </div>
@@ -133,6 +134,7 @@ async function renderJoukkueTab(force = false) {
     try { localStorage.removeItem(cacheStoreKey); } catch {}
     Object.keys(myReactionsCache).forEach(k => delete myReactionsCache[k]);
     myGlobalReactions = {};
+    myGlobalReactionsLoaded = false;
   }
 
   // Reset pagination
@@ -154,12 +156,15 @@ async function renderJoukkueTab(force = false) {
   if (!cachedRaw) el('joukkue-feed').innerHTML = '<div class="loading">Ladataan…</div>';
 
   try {
-    // ── Load current user's reactions (always fresh, one read) ────
-    try {
-      const mySnap = await getUserDoc().get();
-      myGlobalReactions = mySnap.data()?.myReactions || {};
-    } catch (e) {
-      myGlobalReactions = {};
+    // ── Load current user's reactions (skip if already in memory) ───
+    if (!myGlobalReactionsLoaded) {
+      try {
+        const mySnap = await getUserDoc().get();
+        myGlobalReactions = mySnap.data()?.myReactions || {};
+      } catch (e) {
+        myGlobalReactions = {};
+      }
+      myGlobalReactionsLoaded = true;
     }
     // Clear per-entry cache so appendJoukkuePage re-reads from myGlobalReactions
     Object.keys(myReactionsCache).forEach(k => delete myReactionsCache[k]);
@@ -253,16 +258,28 @@ async function renderJoukkueTab(force = false) {
   }
 }
 
+// Suojautuminen rinnakkaisilta toggle-kutsuilta saman entryn yli — race conditioneilla
+// laskurit driftaavat ja revert lukee virheellisen optimistisen tilan.
+const _reactionPending = new Set();
+
 window.toggleReaction = async function toggleReaction(ownerUid, entryId, emoji, btnEl) {
+  const cacheKey    = ownerUid + '_' + entryId;
+  // Jos sama entry on jo pendingissä, ohita kunnes edellinen pyyntö valmistuu
+  if (_reactionPending.has(cacheKey)) return;
+  _reactionPending.add(cacheKey);
+
+  haptic('light');
   const entryRef    = db.collection('users').doc(ownerUid).collection('entries').doc(entryId);
   const reactionRef = entryRef.collection('reactions').doc(currentUser.uid);
   const myUserRef   = getUserDoc();
-  const isActive    = btnEl.classList.contains('active');
+  let isActive      = btnEl.classList.contains('active');
   const inc         = firebase.firestore.FieldValue.increment;
   const fdel        = firebase.firestore.FieldValue.delete;
 
-  const cacheKey    = ownerUid + '_' + entryId;
   const reactionRow = btnEl.closest('.joukkue-reactions');
+  // Disabloi koko rivin napit kunnes toggle valmistuu (no-op jos rowia ei löydy)
+  const buttons = reactionRow ? reactionRow.querySelectorAll('.reaction-btn') : [];
+  buttons.forEach(b => b.disabled = true);
 
   // If adding a reaction, check Firestore for any existing reaction not yet in local caches.
   // This handles reactions made in previous sessions before myReactions tracking was added.
@@ -282,10 +299,10 @@ window.toggleReaction = async function toggleReaction(ownerUid, entryId, emoji, 
     const oldBtn = reactionRow?.querySelector(`[data-emoji="${firestoreExistingEmoji}"]`);
     if (oldBtn) oldBtn.classList.add('active');
   }
-  // If the user clicked the emoji they already have, treat as toggle-off
+  // Jos käyttäjä klikkasi jo olevaa emojia → pakota toggle-off ilman rekursiota
   if (firestoreExistingEmoji === emoji) {
-    btnEl.classList.add('active'); // mark it so isActive logic below removes it
-    return toggleReaction(ownerUid, entryId, emoji, btnEl); // recurse once with active=true
+    isActive = true;
+    btnEl.classList.add('active');
   }
 
   // Find the currently active button (for switching: remove old, add new)
@@ -342,6 +359,9 @@ window.toggleReaction = async function toggleReaction(ownerUid, entryId, emoji, 
     adjustReactionCount(btnEl, isActive ? 1 : -1);
     if (oldActiveBtn) { oldActiveBtn.classList.add('active'); adjustReactionCount(oldActiveBtn, 1); }
     toast('Reaktion tallennus epäonnistui.', 'error');
+  } finally {
+    _reactionPending.delete(cacheKey);
+    buttons.forEach(b => b.disabled = false);
   }
 };
 

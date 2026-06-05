@@ -59,6 +59,7 @@ body {
   z-index: 600;
   background: var(--bg);
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -81,18 +82,39 @@ body {
   gap: 1.25rem;
   min-height: 100vh;
   justify-content: center;
+  position: relative;
 }
+
+.auth-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding: 0 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  pointer-events: none;
+  z-index: 1;
+}
+.auth-footer-left, .auth-footer-right { letter-spacing: 0.02em; }
+.auth-footer-left { font-variant-numeric: tabular-nums; }
 
 .auth-logo {
   line-height: 1;
   margin-bottom: -0.25rem;
+  /* clip-path toimii iOS Safarissa toisin kuin overflow:hidden+border-radius */
+  clip-path: inset(0 round 22%);
+  -webkit-clip-path: inset(0 round 22%);
+  /* drop-shadow seuraa clip-path-muotoa, box-shadow ei */
+  filter: drop-shadow(0 4px 16px rgba(0, 63, 156, 0.28));
 }
 
 .auth-logo img {
   width: 96px;
   height: 96px;
-  border-radius: 22px;
-  box-shadow: 0 4px 20px rgba(0, 63, 156, 0.25);
   display: block;
 }
 
@@ -102,6 +124,54 @@ body {
   color: var(--blue);
   letter-spacing: -0.5px;
   text-align: center;
+}
+
+/* Päivän tervehdys — näkyy vain splash-näytössä (palaava käyttäjä) */
+.auth-greeting {
+  display: none;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--blue-mid);
+  text-align: center;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+.auth-splash .auth-greeting,
+.auth-animating .auth-greeting {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1.2rem;
+}
+
+.auth-week-zone {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0;
+}
+
+.auth-splash .auth-week-zone,
+.auth-animating .auth-week-zone {
+  display: flex;
+}
+
+.auth-wz-week {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.auth-wz-badge {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+.auth-splash .auth-container h1,
+.auth-animating .auth-container h1 {
+  margin-bottom: 0.25rem;
 }
 
 .auth-tabs {
@@ -182,6 +252,62 @@ body {
   min-height: 1.2em;
 }
 
+/* ── Reload splash: logged-in user sees big logo instantly ── */
+.auth-splash .auth-tabs,
+.auth-splash #auth-form,
+.auth-splash #auth-error,
+.auth-splash #forgot-wrap,
+.auth-splash #forgot-success {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auth-splash .auth-logo {
+  filter: drop-shadow(0 12px 40px rgba(0, 63, 156, 0.45));
+}
+
+.auth-splash .auth-logo img {
+  width: min(72vw, 280px);
+  height: auto;
+}
+
+.auth-splash .auth-container h1 {
+  font-size: 2.6rem;
+  letter-spacing: -1.5px;
+  color: var(--blue-deep);
+}
+
+/* ── Login success animation ──────────────────────────────── */
+.auth-animating .auth-tabs,
+.auth-animating #auth-form,
+.auth-animating #auth-error,
+.auth-animating #forgot-wrap,
+.auth-animating #forgot-success {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.auth-animating .auth-logo {
+  filter: drop-shadow(0 12px 40px rgba(0, 63, 156, 0.45));
+  transition: filter 1.6s ease 0.35s;
+}
+
+.auth-animating .auth-logo img {
+  width: min(72vw, 280px);
+  height: auto;
+  transition: width 1.8s cubic-bezier(0.34, 1.08, 0.64, 1) 0.35s;
+}
+
+.auth-animating .auth-container h1 {
+  font-size: 2.6rem;
+  letter-spacing: -1.5px;
+  color: var(--blue-deep);
+  transition: font-size 1.6s cubic-bezier(0.34, 1.08, 0.64, 1) 0.6s,
+              letter-spacing 1.6s ease 0.6s,
+              color 1.0s ease 0.5s;
+}
+
 /* ============================================================
    App Top Bar (header + nav, sticky together)
    ============================================================ */
@@ -200,52 +326,68 @@ body {
    App Header
    ============================================================ */
 header {
-  background: linear-gradient(135deg, var(--blue-deep) 0%, var(--blue) 100%);
+  background: linear-gradient(160deg, #0C2860 0%, #1343A0 50%, #1B5FD0 100%);
   color: white;
-  padding: 0.85rem 1rem;
-  padding-top: max(0.85rem, env(safe-area-inset-top));
+  padding: 0.75rem 1rem 0.9rem;
+  padding-top: max(0.75rem, env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
 }
 
+/* Admin panel keeps h1 */
 header h1 {
-  font-size: 1.05rem;
+  font-size: 1.35rem;
   font-weight: 900;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0.95;
+}
+
+/* Main app: two-line title group */
+.header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.header-app-name {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.header-tab-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 1;
-  min-width: 0;
+  gap: 0.45rem;
+  flex-shrink: 0;
 }
 
-#header-firstname {
-  font-size: 0.85rem;
-  font-weight: 700;
-  opacity: 0.9;
-  white-space: nowrap;
-  letter-spacing: 0.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
-}
+#header-firstname { display: none; }
 
 /* Help button in header — sama koko kuin avatar-nappi */
 .help-btn {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.5);
   background: rgba(255,255,255,0.15);
@@ -299,8 +441,8 @@ header h1 {
 
 /* Admin / coach shortcut in header */
 .admin-shortcut-btn {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.5);
   background: rgba(255,255,255,0.15);
@@ -323,11 +465,11 @@ header h1 {
 
 /* Avatar button in header */
 .avatar-btn {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.5);
-  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.18);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -350,7 +492,7 @@ header h1 {
 }
 
 #header-initials {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 800;
   color: white;
   line-height: 1;
@@ -362,32 +504,36 @@ header h1 {
    ============================================================ */
 .nav-tabs {
   display: flex;
-  background: var(--blue-deep);
+  background: #F2F4F7;
+  padding: 0.5rem 0.75rem 0.45rem;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .nav-tab {
   flex: 1;
-  padding: 0.62rem 0.25rem;
-  border: none;
+  padding: 0.45rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
-  color: rgba(255,255,255,0.45);
-  font-size: 0.7rem;
-  font-weight: 800;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-bottom: 3px solid transparent;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  letter-spacing: 0.01em;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
   touch-action: manipulation;
 }
 
 .nav-tab.active {
-  color: white;
-  border-bottom-color: var(--blue-bright);
-  background: rgba(255,255,255,0.07);
+  color: var(--blue);
+  border-color: var(--blue);
+  background: var(--white);
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(19,67,160,0.18);
 }
 
-.nav-tab:active { background: rgba(255,255,255,0.13); }
+.nav-tab:active { background: var(--blue-ghost); }
 
 /* Sub-tabs (sisällä tab-contentissa) */
 .sub-tabs {
@@ -402,10 +548,9 @@ header h1 {
   border: none;
   background: transparent;
   color: var(--text-soft);
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
@@ -416,6 +561,7 @@ header h1 {
 .sub-tab.active {
   color: var(--blue);
   border-bottom-color: var(--blue);
+  font-weight: 800;
 }
 
 .sub-tab:active { background: var(--blue-ghost); }
@@ -467,6 +613,102 @@ header h1 {
   border: 1px solid var(--border-light);
 }
 
+/* ── PWA-päivityspalkki ───────────────────────────────── */
+.update-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 850;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  background: var(--blue-deep);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
+}
+.update-banner button {
+  flex-shrink: 0;
+  background: #fff;
+  color: var(--blue-deep);
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.update-banner button:disabled { opacity: 0.6; }
+
+/* ── AI Coach ─────────────────────────────────────────── */
+.aicoach-card { padding-bottom: 1rem; }
+.aicoach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* Otsikon oma alamarginaali pois → keskittyy pystysuunnassa napin kanssa */
+.aicoach-header .chart-title { margin: 0; }
+.aicoach-disclaimer {
+  display: block;
+  margin-top: 6px;
+}
+/* Korkeampi spesifisyys kuin .btn-secondary (joka määritellään myöhemmin) */
+.aicoach-header .aicoach-run-btn {
+  flex: 0 0 auto;       /* kumoa btn-secondaryn flex:1 → ei venymistä */
+  width: auto;
+  margin-left: auto;    /* oikeaan laitaan */
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+}
+.aicoach-intro {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 6px 0 0;
+}
+.aicoach-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  font-style: italic;
+}
+/* Sama fontti/koko kuin treenikirjausten kommenteissa (.entry-comment) */
+.aicoach-output {
+  margin-top: 12px;
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.aicoach-output h4 {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--blue-mid);
+  margin: 14px 0 4px;
+}
+.aicoach-output p { margin: 0 0 8px; }
+.aicoach-output p.aicoach-step { font-weight: 600; margin-top: 12px; }
+.aicoach-output ul { margin: 4px 0 10px; padding-left: 1.2rem; }
+.aicoach-output li { margin-bottom: 5px; }
+.aicoach-empty,
+.aicoach-error {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+.aicoach-error { color: var(--red); }
+.aicoach-error-hint {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .chart-title {
   font-size: 0.72rem;
   font-weight: 800;
@@ -482,6 +724,67 @@ header h1 {
 }
 
 .chart-wrap canvas { display: block; }
+
+/* ── Piirakat ─────────────────────────────────────────────────── */
+.pie-charts-row {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.pie-chart-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pie-chart-sub {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.pie-chart-wrap canvas {
+  max-width: 140px;
+  max-height: 140px;
+}
+
+.pie-legend {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+}
+
+.pie-legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pie-legend-label {
+  flex: 1;
+  color: var(--text);
+}
+
+.pie-legend-pct {
+  font-weight: 700;
+  color: var(--text);
+}
 
 /* ============================================================
    Main / List
@@ -509,6 +812,183 @@ main {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--blue-mid);
+}
+
+/* ── Viikkoyhteenveto-kortti (Loki-välilehti) ── */
+.week-summary-card {
+  margin: 0 0 0.75rem;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #1444A0 0%, #1B62D4 55%, #3A82F0 100%);
+  color: #fff;
+  padding: 0.9rem 1.1rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 4px 18px rgba(20,68,160,0.28);
+  overflow: hidden;
+  position: relative;
+}
+/* Past-week variant — slightly muted, no box-shadow */
+.week-summary-card--past {
+  background: linear-gradient(135deg, #0E2F6E 0%, #143D8A 55%, #1E55C0 100%);
+  box-shadow: 0 2px 10px rgba(14,47,110,0.22);
+  margin-top: 1.1rem;
+}
+.week-summary-card--past .wsc-big {
+  font-size: 1.8rem;
+}
+
+/* decorative circle – top right */
+.week-summary-card::after {
+  content: '';
+  position: absolute;
+  top: -28px; right: -28px;
+  width: 110px; height: 110px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  pointer-events: none;
+}
+
+.wsc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wsc-title {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  opacity: 0.80;
+}
+
+.wsc-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: start;
+  column-gap: 0.75rem;
+  row-gap: 6px;
+}
+
+.wsc-grid > .wsc-week         { grid-column: 1; grid-row: 1; align-self: center; }
+.wsc-grid > .wsc-zone-inline  { grid-column: 2; grid-row: 1; align-self: center; }
+.wsc-grid > .wsc-count-row    { grid-column: 1; grid-row: 2; align-self: center; }
+.wsc-grid > .wsc-goals        { grid-column: 2; grid-row: 2; }
+
+.wsc-week {
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.78;
+}
+
+.wsc-zone-inline {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.78;
+  text-align: right;
+}
+
+.wsc-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.wsc-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.wsc-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.wsc-goal-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.88;
+  white-space: nowrap;
+}
+
+.wsc-ring {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.wsc-ring-bg {
+  fill: none;
+  stroke: rgba(255,255,255,0.22);
+  stroke-width: 4;
+}
+
+.wsc-ring-fg {
+  fill: none;
+  stroke: rgba(255,255,255,0.92);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.wsc-count-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  line-height: 1;
+}
+
+.wsc-big {
+  font-size: 2.5rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.wsc-meta {
+  font-size: 0.95rem;
+  font-weight: 600;
+  opacity: 0.88;
+}
+
+.wsc-bar-wrap {
+  display: flex;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+}
+
+.wsc-bar-seg {
+  border-radius: 3px;
+  min-width: 4px;
+}
+
+.wsc-labels {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.wsc-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.88;
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.wsc-label-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .joukkue-cache-ts {
@@ -775,12 +1255,12 @@ main {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-light) 100%);
+  background: radial-gradient(circle at 38% 32%, #5BAEE8 0%, #2168CC 45%, #1343A0 100%);
   color: white;
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  box-shadow: 0 4px 18px rgba(0,63,156,0.5);
+  box-shadow: 0 6px 22px rgba(19,67,160,0.50), 0 2px 6px rgba(0,0,0,0.18);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -791,7 +1271,7 @@ main {
 
 .fab:active {
   transform: scale(0.92);
-  box-shadow: 0 2px 8px rgba(0,63,156,0.35);
+  box-shadow: 0 2px 10px rgba(19,67,160,0.35);
 }
 
 /* ============================================================
@@ -823,6 +1303,47 @@ main {
   border-top: 3px solid var(--blue);
 }
 
+/* Profiiliportaali — flex-kolumni: header+tabsit kiinteitä, vain paneelit scrollaavat */
+#profile-modal .modal-content {
+  height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* ei ulkoista scrollia */
+  padding-bottom: 0;
+}
+
+#profile-modal .modal-header {
+  flex-shrink: 0;
+}
+
+.profile-portal-panel:not(.hidden) {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0; /* flex-fix */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.profile-portal-panel:not(.hidden)::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Android */
+}
+
+/* Impersonoitu profiili — read-only viewing mode */
+.profile-modal--viewing .form-actions,
+.profile-modal--viewing .avatar-upload-actions,
+.profile-modal--viewing #remove-avatar-btn,
+.profile-modal--viewing .profile-extra-actions,
+.profile-modal--viewing .profile-section-label--account,
+.profile-modal--viewing [data-profile-tab="tavoitteet"] { display: none !important; }
+
+.profile-modal--viewing #profile-form input,
+.profile-modal--viewing #profile-form select {
+  pointer-events: none;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -838,7 +1359,7 @@ main {
   text-transform: uppercase;
 }
 
-#close-modal, #close-profile, #close-admin {
+#close-modal, #close-profile, #close-admin, #close-help {
   background: var(--blue-ghost);
   border: none;
   width: 34px;
@@ -854,7 +1375,7 @@ main {
   transition: background 0.2s;
 }
 
-#close-modal:active, #close-profile:active, #close-admin:active {
+#close-modal:active, #close-profile:active, #close-admin:active, #close-help:active {
   background: var(--blue-pale);
 }
 
@@ -865,7 +1386,8 @@ main {
   margin-bottom: 1.1rem;
 }
 
-.form-group > label {
+.form-group > label,
+.form-group .comment-label-row > label:first-child {
   display: block;
   font-size: 0.72rem;
   font-weight: 800;
@@ -997,7 +1519,7 @@ main {
   pointer-events: none;
 }
 
-.form-group input:focus,
+.form-group input:not([type="checkbox"]):focus,
 .form-group select:focus,
 .form-group textarea:focus {
   border-color: var(--blue);
@@ -1009,6 +1531,18 @@ main {
   resize: none;
   line-height: 1.5;
 }
+
+.comment-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.comment-label-row label:first-child {
+  margin-bottom: 0 !important;
+}
+
 
 .char-counter {
   margin-top: 0.3rem;
@@ -1054,6 +1588,9 @@ main {
   height: 17px;
   accent-color: var(--blue);
   cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  flex-shrink: 0;
 }
 
 /* ============================================================
@@ -1363,6 +1900,177 @@ main {
 }
 
 /* Profile section divider labels */
+/* ── Profiiliportaalin välilehdet ────────────────────────────── */
+.profile-portal-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: -0.25rem -1rem 1.25rem;
+  padding: 0 1rem;
+  border-bottom: 2px solid var(--border-light);
+  flex-shrink: 0; /* ei skaalaannu pois flex-kolumnissa */
+  background: var(--white);
+}
+
+.profile-portal-tab {
+  padding: 0.55rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.profile-portal-tab.active {
+  color: var(--blue);
+  font-weight: 700;
+  border-bottom-color: var(--blue);
+}
+
+.profile-portal-tab:not(.active):hover {
+  color: var(--text);
+}
+
+/* ── Profiiliportaalin "tulossa pian" -paneeli ───────────────── */
+.profile-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3rem 1rem;
+  gap: 0.75rem;
+}
+
+.profile-coming-soon-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.profile-coming-soon-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--blue-deep);
+}
+
+.profile-coming-soon-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* ── Ennätykset ──────────────────────────────────────────────── */
+.ennatykset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+}
+
+.ennätys-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+
+.ennätys-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 2.25rem;
+  text-align: center;
+}
+
+.ennätys-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ennätys-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--blue-mid);
+}
+
+.ennätys-value {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--blue-deep);
+  line-height: 1.1;
+}
+
+.ennätys-unit {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ennätys-week {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ennätys-stats-row {
+  display: flex;
+  gap: 1.75rem;
+  align-items: baseline;
+}
+
+/* ── Tavoitelomake ───────────────────────────────────────────── */
+.tavoite-form {
+  padding-top: 0.25rem;
+}
+
+.tavoite-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tavoite-input-row input[type="number"] {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color 0.2s;
+}
+
+.tavoite-input-row input[type="number"]:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-pale);
+}
+
+.tavoite-unit {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 2rem;
+}
+
+.goals-save-status {
+  font-size: 0.85rem;
+  color: var(--green);
+  font-weight: 600;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* ─────────────────────────────────────────────────────────────── */
 .profile-section-label {
   font-size: 0.72rem;
   font-weight: 800;
@@ -1515,12 +2223,12 @@ main {
 }
 
 .admin-user-avatar {
-  width: 72px;
-  height: 72px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: var(--blue-pale);
   color: var(--blue);
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -1539,15 +2247,14 @@ main {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .admin-user-actions {
   display: flex;
   gap: 0.4rem;
-  flex-shrink: 0;
+  flex-wrap: nowrap;
 }
 
 .btn-csv-sm {
@@ -1582,15 +2289,14 @@ main {
 .admin-list-refresh-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.25rem 1rem 0.75rem;
+  gap: 0.25rem;
+  padding: 0.25rem 1rem 0.75rem calc(1rem + 48px + 0.75rem);
 }
 .admin-list-count {
   font-size: 0.8rem;
+  font-weight: 700;
   color: var(--text-muted);
-}
-.admin-list-refresh-btn {
-  flex: 0 0 auto;
+  flex: 1;
 }
 
 .admin-user-name {
@@ -1658,12 +2364,13 @@ main {
 
 /* ── Pieni nappulaperusta admin-käyttäjälistalle ── */
 .btn-sm {
-  padding: 0.4rem 0.75rem;
+  padding: 0.35rem 0.6rem;
   border-radius: var(--radius-sm);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .btn-view-sm {
@@ -1880,6 +2587,7 @@ main {
 .act-card {
   padding: 0.55rem 0.75rem;
   border-bottom: 1px solid var(--border-light);
+  overflow: hidden;
 }
 
 .act-card:last-child { border-bottom: none; }
@@ -1944,14 +2652,15 @@ main {
   gap: 2px;
   flex-wrap: nowrap;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .act-week-cell {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   height: 14px;
   border-radius: 3px;
-  flex-shrink: 0;
 }
 .act-week-0 { background: #c8d8ee; }
 .act-week-1 { background: #bfdbfe; }
@@ -2095,6 +2804,15 @@ main {
   accent-color: var(--blue);
   flex-shrink: 0;
   cursor: pointer;
+}
+
+/* Kun .team-checkbox-item on .form-groupin suora lapsi (jako- ja AI Coach -täpät),
+   .form-group > label asettaa sille display:block ja tappaa flex-gapin → teksti
+   liimautuu täppään. Palautetaan flex-asettelu, jotta gap (väli) toimii. */
+.form-group > label.team-checkbox-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
 }
 
 /* ============================================================
@@ -2467,17 +3185,48 @@ details[open] .form-extra-toggle::after {
 
 /* ── Help modal ─────────────────────────────────────────────── */
 .help-modal-content {
-  max-height: 88vh;
+  height: 92vh;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.help-tab-nav {
+  display: flex;
+  border-bottom: 2px solid var(--border-light);
+  padding: 0 1.25rem;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.help-tab-btn {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.help-tab-btn.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
 }
 
 .help-version-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1.25rem 0.75rem;
+  padding: 0.5rem 0 0.75rem;
   border-bottom: 1px solid var(--border-light);
+  margin-bottom: 0.25rem;
 }
 
 .help-version {
@@ -2817,7 +3566,7 @@ details[open] .form-extra-toggle::after {
 .cal-month-header {
   font-size: 1rem;
   font-weight: 700;
-  padding: 10px 16px 6px;
+  padding: 10px 4px 6px;
   margin: 0;
   color: var(--text);
 }
@@ -2825,16 +3574,16 @@ details[open] .form-extra-toggle::after {
 .cal-grid {
   display: grid;
   grid-template-columns: 38px repeat(7, 1fr);
-  border-top: 1px solid var(--border-light);
-  border-left: 1px solid var(--border-light);
+  gap: 1px;
+  padding: 0;
+  background: #ffffff; /* valkoinen → pyöristyskulmista paistaa vain valkoinen */
 }
 
 .cal-cell {
-  border-right: 1px solid var(--border-light);
-  border-bottom: 1px solid var(--border-light);
   min-height: 52px;
   position: relative;
   background: var(--white);
+  outline: 1px solid rgba(0,0,0,0.06); /* hento ruudukkoviiva */
 }
 
 /* Sarake- ja riviotsikot */
@@ -2850,7 +3599,7 @@ details[open] .form-extra-toggle::after {
 
 .cal-wk-hdr { font-size: 0.62rem; }
 
-.cal-sun-hdr { color: #e84040; }
+.cal-sun-hdr { color: inherit; }
 
 /* Viikkonumero-solu */
 .cal-wk-cell {
@@ -2896,41 +3645,58 @@ details[open] .form-extra-toggle::after {
   line-height: 1;
 }
 
-/* Päiväsolu — päivänumero */
+/* Päiväsolu — päivänumero — oikeassa yläkulmassa */
 .cal-day-num {
   position: absolute;
-  top: 4px;
-  right: 5px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text);
+  top: 5px;
+  right: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
   line-height: 1;
 }
 
-.cal-sun { color: #e84040; }
+.cal-sun { color: inherit; }
 
-/* Tehoalue-teksti solun sisällä */
+/* Tehoalue-teksti — keskitettynä alalaidassa, marginaali pohjasta */
 .cal-perf {
   position: absolute;
-  bottom: 5px;
+  bottom: 7px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.92);
 }
 
-/* Treeniväri taustavärinä — teksti valkoiseksi */
+/* Treenipäivä — tehoalueen taustaväri, pyöristys, varjo, gradient-kiilto */
+.cal-day-workout {
+  border-radius: 9px;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.10);
+}
+
+.cal-day-workout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.22) 0%, transparent 55%);
+  pointer-events: none;
+}
+
 .cal-day-workout .cal-day-num,
 .cal-day-workout .cal-perf {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255,255,255,0.95);
 }
 
-/* Tänään ilman treeniä — sininen highlight */
+/* Tänään ilman treeniä — pyöreä sininen */
 .cal-today {
   background: var(--blue) !important;
+  border-radius: 9px;
+  outline: none;
 }
 
 .cal-today .cal-day-num {
@@ -2938,14 +3704,95 @@ details[open] .form-extra-toggle::after {
   font-weight: 700;
 }
 
-/* Tänään + treeni — sisäreunus korostaa "tänään" */
+/* Tänään + treeni — valkoinen sisäreunus korostaa "tänään" */
 .cal-today-workout {
-  box-shadow: inset 0 0 0 2.5px rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.10),
+              inset 0 0 0 2.5px rgba(255,255,255,0.75);
 }
 
 /* Kuukauden ulkopuolella olevat päivät */
 .cal-out {
   background: var(--bg) !important;
+}
+
+/* ── MJ-tapahtuma: violetti piste päivänumeron edessä ────────── */
+.cal-mj-event .cal-day-num::before {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7B61FF;
+  top: 50%;
+  transform: translateY(-50%);
+  right: calc(100% + 3px);
+}
+
+/* Tänään + tapahtuma: numero ja piste molemmat valkoiset */
+.cal-today.cal-mj-event .cal-day-num,
+.cal-today-workout.cal-mj-event .cal-day-num {
+  color: #fff !important;
+}
+.cal-today.cal-mj-event .cal-day-num::before,
+.cal-today-workout.cal-mj-event .cal-day-num::before {
+  background: #fff;
+}
+
+/* Workout + tapahtuma: valkoinen piste (tausta on värjätty) */
+.cal-day-workout.cal-mj-event .cal-day-num::before {
+  background: rgba(255,255,255,0.9);
+}
+
+/* ── Kalenterin tooltip ──────────────────────────────────────── */
+.cal-tooltip {
+  position: fixed;
+  z-index: 800;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 0.45rem 0.7rem;
+  min-width: 140px;
+  max-width: 200px;
+  pointer-events: none;
+}
+
+.cal-tip-date {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.15rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.cal-tip-entry {
+  font-size: 0.8rem;
+  color: var(--text);
+  padding: 0.1rem 0;
+  line-height: 1.3;
+}
+
+.cal-tip-event {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #7B61FF;
+  line-height: 1.35;
+  padding-top: 0.3rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.cal-tip-event:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.cal-tip-dates {
+  font-weight: 400;
+  font-size: 0.73rem;
+  color: var(--text-muted);
 }
 
 /* Lataus- ja scroll-indikaattorit */
@@ -2955,4 +3802,779 @@ details[open] .form-extra-toggle::after {
   text-align: center;
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+/* ============================================================
+   Testit — 10×100m räpyläpotkutesti
+   ============================================================ */
+.testit-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem 0.25rem;
+}
+.testit-section-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+}
+.testit-add-btn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+}
+.testit-chart-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 0 1rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+/* ── Lisää testi -sheet ─────────────────────────────────────── */
+.bottom-sheet--tall {
+  max-height: 92vh;
+}
+.testit-form-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.testit-date-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.testit-date-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.testit-date-input {
+  flex: 1;
+}
+#lihas-sheet .testit-date-row {
+  justify-content: space-between;
+}
+#lihas-sheet .testit-date-input {
+  flex: none;
+  width: 48%;
+}
+.testit-grid-header {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr 1fr 1fr 2rem;
+  gap: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border-light);
+}
+.testit-row {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr 1fr 1fr 2rem;
+  gap: 0.3rem 0.5rem;
+  align-items: center;
+}
+.testit-row-num {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+}
+.testit-input {
+  padding: 0.45rem 0.4rem;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+.testit-input:focus {
+  border-color: var(--blue);
+  outline: none;
+}
+.testit-checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  justify-self: center;
+  cursor: pointer;
+  accent-color: #F5A623;
+}
+.testit-save-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* ── Testit-alivalilehdet ─────────────────────────────────── */
+.testit-sub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border-light);
+  padding: 0 1rem;
+  margin-bottom: 0;
+  position: sticky;
+  top: 0; /* stickytää paneelinsa scroll-containerin yläreunaan */
+  background: var(--white);
+  z-index: 5;
+  transform: translateZ(0);
+  flex-shrink: 0;
+}
+
+.testit-sub-tab {
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.testit-sub-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.testit-sub-panel {
+  /* täysi leveys */
+}
+
+/* ── Testit-sisältö ──────────────────────────────────────── */
+.testit-sub-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 0.6rem 1rem 0;
+  margin: 0;
+}
+
+.testit-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem 0.25rem;
+}
+
+.testit-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #F5A623;
+  flex-shrink: 0;
+}
+
+.testit-legend-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ── Testien poistolista ─────────────────────────────────── */
+.testit-delete-section {
+  padding: 1rem 1rem 1.25rem;
+  border-top: 1px solid var(--border-light);
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.testit-delete-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.testit-delete-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.testit-delete-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.testit-delete-date {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.testit-delete-btn {
+  padding: 0.3rem 0;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  width: 4.5rem;
+  text-align: center;
+}
+
+.testit-input:disabled,
+.testit-date-input:disabled {
+  opacity: 0.65;
+  background: var(--bg);
+  cursor: default;
+}
+
+.testit-checkbox:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+/* ============================================================
+   Tapahtumat-välilehti (Joukkue → Tapahtumat)
+   ============================================================ */
+.tapahtumat-content {
+  padding: 0.75rem 1rem 2rem;
+}
+
+/* ── MM-kisat laskuri ──────────────────────────── */
+.tapahtumat-countdown {
+  background: linear-gradient(135deg, #0C2860 0%, #1343A0 55%, #1B5FD0 100%);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.25rem;
+  margin: 0.75rem 0 0.5rem;
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(0, 63, 156, 0.28);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tapahtumat-countdown-days {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.tapahtumat-countdown-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tapahtumat-countdown-label {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: rgba(255,255,255,0.92);
+}
+
+.tapahtumat-countdown-sub {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.6);
+}
+
+.tapahtumat-section {
+  margin-bottom: 0.25rem;
+}
+
+.tapahtumat-hdr {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 1rem 0 0.35rem;
+}
+
+.tapahtumat-today-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 1rem 0 0;
+}
+
+.tapahtumat-today-divider::before {
+  content: '';
+  flex: 1;
+  border-top: 2px solid var(--border);
+}
+
+.tapahtumat-today-label {
+  padding: 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tapahtumat-today-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 2px solid var(--border);
+}
+
+.tapahtumat-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  align-items: baseline;
+  gap: 0 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.88rem;
+}
+
+.tapahtumat-row:last-child {
+  border-bottom: none;
+}
+
+.tapahtumat-date {
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.tapahtumat-name {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.tapahtumat-place {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.tapahtumat-note {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: 0.15rem;
+}
+
+.tapahtumat-link {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--blue-light);
+  font-weight: 400;
+  margin-top: 0.2rem;
+  text-decoration: none;
+}
+
+.tapahtumat-link:hover {
+  text-decoration: underline;
+}
+
+.tapahtumat-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 1.5rem 0;
+  text-align: center;
+}
+
+/* ── Viikko-Ohje ──────────────────────────────────────────── */
+.viikkoohje-content {
+  padding: 1rem 1rem 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Toggle-palkki */
+.viikkoohje-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 1rem;
+}
+
+.viikkoohje-toggle-btn {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1.5px solid var(--border-light);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.viikkoohje-card { padding-bottom: 1rem; }
+
+.viikkoohje-week-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--blue-mid);
+  margin: 0 0 10px;
+}
+
+/* Body text matches AI Coach output exactly */
+.viikkoohje-output {
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.viikkoohje-output h4 {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--blue-mid);
+  margin: 14px 0 2px;
+}
+
+.viikkoohje-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+.viikkoohje-output p  { margin: 0 0 8px; }
+.viikkoohje-output ul { margin: 4px 0 10px; padding-left: 0.4rem; list-style: none; }
+.viikkoohje-output li { margin-bottom: 5px; }
+
+.viikkoohje-note {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+/* Tehoalue-selite-kortti */
+.viikkoohje-def-card {
+  background: var(--bg);
+  border-left: 3px solid var(--border-light);
+  border-radius: 0 6px 6px 0;
+  padding: 6px 10px;
+  margin: 4px 0 10px;
+}
+
+.viikkoohje-def-row {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+
+.viikkoohje-def-label {
+  font-weight: 600;
+}
+
+/* Tulevat viikot */
+.viikkoohje-upcoming {
+  margin: 4px 0 0;
+}
+
+.viikkoohje-upcoming-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.viikkoohje-upcoming-row:last-child { border-bottom: none; }
+
+.viikkoohje-upcoming-week {
+  font-weight: 600;
+  min-width: 2.8rem;
+  color: var(--text);
+}
+
+.viikkoohje-upcoming-zone {
+  font-weight: 700;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.viikkoohje-upcoming-empty {
+  color: var(--border-light);
+}
+
+/* Lihaskunto team legend */
+.lihas-legend {
+  display: flex;
+  gap: 1rem;
+  padding: 0.4rem 0 0 1rem;
+  flex-wrap: wrap;
+}
+.lihas-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.lihas-legend-dash {
+  display: inline-block;
+  width: 22px;
+  border-top: 2px dashed;
+  flex-shrink: 0;
+}
+.lihas-legend-dash--dot {
+  border-top-style: dotted;
+  border-top-width: 3px;
+}
+
+/* ============================================================
+   KUORMA-VÄLILEHTI (EWMA ACWR)
+   ============================================================ */
+.kuorma-disclaimer {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0.9rem 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.kuorma-disclaimer[open] { padding-bottom: 0.6rem; }
+/* Otsikko (summary) — sama tyyli kuin "TEHOALUE:" Trendit-sivulla */
+.kuorma-disclaimer-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  user-select: none;
+}
+.kuorma-disclaimer-title::-webkit-details-marker { display: none; }
+.kuorma-disclaimer-title::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--text-muted);
+  transition: transform .2s;
+}
+.kuorma-disclaimer[open] .kuorma-disclaimer-title::after {
+  transform: rotate(180deg);
+}
+.kuorma-disclaimer-body { padding-top: 10px; }
+.kuorma-disclaimer p {
+  font-size: 0.78rem;
+  color: #1e40af;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.kuorma-disclaimer p:last-child { margin-bottom: 0; }
+.kuorma-disclaimer-method {
+  font-size: 0.7rem !important;
+  opacity: 0.75;
+  margin-top: 6px !important;
+}
+
+/* Graafin alle tuleva lukuohje — sama tyyli kuin .chart-subtitle yläpuolella */
+/* HUOM: .chart-subtitle käyttää shorthand-marginaalia, joten käytetään
+   tuplaluokkavalitsijaa specificityn nostamiseksi. */
+.chart-subtitle.chart-readguide {
+  margin: 15px 0 0;
+  text-align: left;
+}
+.chart-subtitle.chart-readguide-goal {
+  margin: 15px 0 0;
+  text-align: left;
+}
+.chart-readguide strong,
+.chart-readguide-goal strong { font-weight: 700; }
+
+/* ACWR Gauge */
+.kuorma-acwr-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.kuorma-gauge-wrap {
+  position: relative;
+  width: 180px;
+  flex-shrink: 0;
+}
+.kuorma-gauge-svg { width: 100%; height: auto; }
+.kuorma-gauge-center {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+.kuorma-gauge-val {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+.kuorma-gauge-lbl {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.kuorma-acwr-info { flex: 1; padding-top: 4px; }
+/* Tietokoneella info-osuus keskelle jäljellä olevaa tilaa (lähempänä oikeaa laitaa) */
+@media (min-width: 600px) {
+  .kuorma-acwr-info { text-align: center; }
+}
+
+.kuorma-status-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+.kuorma-status--ok     { background: #dcfce7; color: #15803d; }
+.kuorma-status--low    { background: #dbeafe; color: #1d4ed8; }
+.kuorma-status--warn   { background: #fef9c3; color: #92400e; }
+.kuorma-status--danger { background: #fee2e2; color: #991b1b; }
+.kuorma-status--na     { background: #f3f4f6; color: #6b7280; }
+
+.kuorma-kpi-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.kuorma-kpi { display: flex; flex-direction: column; }
+.kuorma-kpi-label { font-size: 0.67rem; color: var(--text-muted); }
+.kuorma-kpi-val   { font-size: 0.92rem; font-weight: 700; }
+
+.kuorma-scale-wrap { margin-top: 2px; }
+.kuorma-scale-bar {
+  height: 6px;
+  border-radius: 3px;
+  /* Vyöhykkeet vastaavat arvoasteikkoa 0–2.0:
+     0–0.8 sininen (alikuormitus), 0.8–1.3 vihreä (optimi),
+     1.3–1.5 keltainen (tarkkaile), 1.5–2.0 punainen (korkea) */
+  background: linear-gradient(to right,
+    #60a5fa 0%, #60a5fa 35%,
+    #4ade80 45%, #4ade80 60%,
+    #facc15 70%, #facc15 73%,
+    #ef4444 80%, #dc2626 100%);
+  position: relative;
+}
+.kuorma-scale-marker {
+  position: absolute;
+  top: -4px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 3px solid var(--text-muted);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.kuorma-scale-labels {
+  position: relative;
+  height: 0.85rem;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.kuorma-scale-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.kuorma-scale-labels span:first-child { transform: translateX(0); }
+.kuorma-scale-labels span:last-child  { transform: translateX(-100%); }
+
+/* chart-subtitle */
+.chart-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: -6px 0 8px;
+  line-height: 1.4;
+}
+.chart-wrap--sm { height: 200px !important; }
+
+/* Tehoaluetaulukko */
+.kuorma-zones-info { padding-bottom: 2px; }
+.kuorma-zone-table { display: flex; flex-direction: column; gap: 10px; }
+.kuorma-zone-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+.kuorma-zone-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.kuorma-zone-row > div:nth-child(2) {
+  flex: 1;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.kuorma-zone-row strong { font-size: 0.8rem; }
+.kuorma-zone-row span { color: var(--text-muted); }
+.kuorma-zone-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Datalaatu */
+.kuorma-dq-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.77rem;
+}
+.kuorma-dq-label { color: var(--text-muted); }
+.kuorma-dq-bar-wrap {
+  flex: 1;
+  min-width: 80px;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.kuorma-dq-bar-fill {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.kuorma-dq-pct { font-weight: 700; color: var(--text); }
+
+/* Offline banner */
+.offline-banner {
+  background: #1e3a5f;
+  color: #bfdbfe;
+  font-size: 0.78rem;
+  text-align: center;
+  padding: 7px 14px;
+  line-height: 1.4;
 }

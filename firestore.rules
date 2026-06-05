@@ -17,10 +17,10 @@ service cloud.firestore {
       // Admin can read/delete any user doc
       allow delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
 
-      // Admin can write myReactions and coachOf to any user doc
+      // Admin can write myReactions, coachOf and records to any user doc
       allow update: if request.auth != null
         && request.auth.token.email == 'janne.lind@gmail.com'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['myReactions', 'coachOf']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['myReactions', 'coachOf', 'records']);
 
       match /entries/{entryId} {
         // Owner can read/write their own entries
@@ -40,6 +40,24 @@ service cloud.firestore {
           allow read: if request.auth != null;
           allow write, delete: if request.auth != null && request.auth.uid == reactorId;
         }
+      }
+
+      match /fitTests/{testId} {
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+        // Admin can read any user's fit tests (for impersonation view)
+        allow read: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+      }
+
+      match /maxSpeedTests/{testId} {
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+        // Admin can read any user's max speed tests (for impersonation view)
+        allow read: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+      }
+
+      match /muscleTests/{testId} {
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+        // Any authenticated user can read (needed for team comparison)
+        allow read: if request.auth != null;
       }
     }
   }

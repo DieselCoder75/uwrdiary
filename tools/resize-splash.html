@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UWR Diary – Splash-kuvan muokkaustyökalu</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 24px 16px;
+      gap: 20px;
+    }
+    h1 { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .sub { font-size: 0.82rem; color: #94a3b8; text-align: center; max-width: 480px; line-height: 1.5; }
+
+    #drop-zone {
+      width: 100%; max-width: 560px;
+      border: 2px dashed #334155; border-radius: 14px;
+      padding: 36px 20px; text-align: center;
+      cursor: pointer; transition: border-color .2s, background .2s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: #3b82f6; background: rgba(59,130,246,.07);
+    }
+    #drop-zone p { font-size: 0.9rem; color: #64748b; }
+    #drop-zone .emoji { font-size: 2.5rem; margin-bottom: 10px; }
+
+    #editor { display: none; flex-direction: column; align-items: center; gap: 16px; width: 100%; max-width: 560px; }
+
+    .canvas-row {
+      display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; justify-content: center;
+    }
+    .canvas-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .canvas-label { font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+
+    #src-canvas { border-radius: 8px; cursor: move; max-width: 100%; touch-action: none; }
+
+    #preview-canvas {
+      width: 220px; height: 220px;
+      border-radius: 12px;
+      box-shadow: 0 0 0 2px #3b82f6;
+      flex-shrink: 0;
+    }
+
+    .info-box {
+      background: #1e293b; border-radius: 10px; padding: 12px 16px;
+      font-size: 0.8rem; color: #94a3b8; line-height: 1.6; width: 100%;
+    }
+    .info-box strong { color: #e2e8f0; }
+    .info-box .warn { color: #f59e0b; }
+    .info-box .ok { color: #6ee7b7; }
+
+    .hint { font-size: 0.78rem; color: #475569; text-align: center; }
+
+    button {
+      background: #3b82f6; color: #fff;
+      border: none; border-radius: 10px;
+      padding: 12px 28px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #334155; color: #64748b; cursor: default; }
+
+    .btn-success { background: #16a34a; }
+    .btn-success:hover { background: #15803d; }
+
+    #filename-row {
+      display: flex; gap: 8px; align-items: center; width: 100%; flex-wrap: wrap;
+    }
+    #filename-row input {
+      flex: 1; min-width: 100px; background: #1e293b; border: 1px solid #334155;
+      border-radius: 8px; padding: 9px 12px; color: #e2e8f0;
+      font-size: 0.88rem; outline: none;
+    }
+    #filename-row input:focus { border-color: #3b82f6; }
+
+    #save-btn, #autosave-btn { padding: 10px 18px; font-size: 0.9rem; }
+    #reset-btn {
+      background: transparent; border: 1px solid #334155;
+      color: #64748b; padding: 10px 16px; font-size: 0.82rem;
+    }
+    #reset-btn:hover { border-color: #64748b; color: #94a3b8; background: transparent; }
+
+    .badge {
+      display: inline-block; background: #134e4a; color: #6ee7b7;
+      font-size: 0.7rem; font-weight: 700; padding: 2px 7px;
+      border-radius: 6px; margin-left: 4px;
+    }
+    .badge-warn { background: #422006; color: #fbbf24; }
+  </style>
+</head>
+<body>
+
+<h1>🏊 UWR Diary — Logo-kuvatyökalu</h1>
+<p class="sub">Raahaa kuva alle. Säädä crop-aluetta vetämällä keskeltä tai kulmista, lataa valmis <strong>512×512 px PNG</strong> suoraan <code>img/splash/</code>-kansioon.</p>
+
+<label id="drop-zone" for="file-input">
+  <div class="emoji">🖼</div>
+  <p>Raahaa kuva tänne tai klikkaa valitaksesi</p>
+  <p style="margin-top:4px;font-size:0.75rem;">JPG, PNG, WEBP — mikä tahansa koko käy</p>
+</label>
+<input type="file" id="file-input" accept="image/*" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:0;height:0;">
+
+<div id="editor">
+
+  <div class="canvas-row">
+    <div class="canvas-wrap" style="flex:1;min-width:240px">
+      <span class="canvas-label">Alkuperäinen — keskeltä = liikuta · kulmista = säädä kokoa</span>
+      <canvas id="src-canvas"></canvas>
+      <span class="hint">Puna-valkoinen kehys = mitä leikataan (aina neliö)</span>
+    </div>
+    <div class="canvas-wrap">
+      <span class="canvas-label">Esikatselu <span class="badge">512×512</span></span>
+      <canvas id="preview-canvas" width="512" height="512"></canvas>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>Tiedot:</strong> <span id="img-info"></span><br>
+    <strong>Crop-alue:</strong> <span id="crop-info"></span><br>
+    <strong>Resoluutio:</strong> <span id="res-info"></span>
+  </div>
+
+  <div id="filename-row">
+    <input type="text" id="filename-input" placeholder="splash-1" value="splash-1">
+    <span style="color:#64748b;font-size:.88rem">.png</span>
+    <button id="autosave-btn" class="btn-success" onclick="autoSaveResult()">💾 Tallenna kansioon</button>
+    <button id="save-btn" onclick="downloadResult()">⬇ Lataa</button>
+    <button id="reset-btn" onclick="resetTool()">✕ Uusi kuva</button>
+  </div>
+
+</div>
+
+<script>
+  // ── Tavoitekoko ──────────────────────────────────────────────
+  const TARGET_W = 512;
+  const TARGET_H = 512;
+  const MIN_CROP_PX  = 100;  // minimi crop-koko alkuperäisen kuvan pikseleinä
+  const RES_OK_PX    = 400;  // riittävä resoluutio
+
+  // ── State ────────────────────────────────────────────────────
+  let srcImg   = null;
+  let cropX    = 0, cropY = 0, cropW = 0, cropH = 0;
+  let mode     = null; // 'move' | 'nw' | 'ne' | 'sw' | 'se'
+  let startMX  = 0, startMY = 0;
+  let startCrop = { x:0, y:0, w:0, h:0 };
+  let scale    = 1;
+  let dirHandle = null; // File System Access API folder handle (cached in IndexedDB)
+
+  const HANDLE_SIZE = 14; // px (canvas-koordinaatit)
+
+  // ── Canvases ─────────────────────────────────────────────────
+  const srcCanvas  = document.getElementById('src-canvas');
+  const srcCtx     = srcCanvas.getContext('2d');
+  const prevCanvas = document.getElementById('preview-canvas');
+  const prevCtx    = prevCanvas.getContext('2d');
+
+  // ── Drop / File ──────────────────────────────────────────────
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadFile(file);
+  });
+  document.getElementById('file-input').addEventListener('change', e => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  function loadFile(file) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = async () => {
+      URL.revokeObjectURL(url);
+      srcImg = img;
+      initCrop();
+      document.getElementById('img-info').textContent =
+        `${img.naturalWidth} × ${img.naturalHeight} px  (${(file.size/1024/1024).toFixed(1)} MB)`;
+      const nextNum = await detectNextSplashNumber();
+      document.getElementById('filename-input').value = `splash-${nextNum}`;
+      document.getElementById('drop-zone').style.display = 'none';
+      document.getElementById('editor').style.display = 'flex';
+    };
+    img.src = url;
+  }
+
+  // ── Auto-detect next splash-N number ─────────────────────────
+  async function detectNextSplashNumber() {
+    // Yritä HEAD-requesteja splash-N.png:lle, kunnes saadaan 404
+    // Cache-busting query → ohittaa service workerin ja browser-cachen
+    const base = '../img/splash/';
+    const bust = Date.now();
+    for (let n = 1; n <= 50; n++) {
+      try {
+        const res = await fetch(`${base}splash-${n}.png?nocache=${bust}`, {
+          method: 'HEAD',
+          cache: 'no-store',
+        });
+        if (!res.ok) return n;
+      } catch {
+        return n;
+      }
+    }
+    return 1;
+  }
+
+  // Suorita numero-tarkistus heti sivulatauksessa → input-kenttä näyttää
+  // oikean numeron jo ennen kuin kuva on ladattu
+  (async () => {
+    const n = await detectNextSplashNumber();
+    const input = document.getElementById('filename-input');
+    input.value = `splash-${n}`;
+    input.placeholder = `splash-${n}`;
+  })();
+
+  function initCrop() {
+    const maxW = Math.min(500, window.innerWidth - 64);
+    scale = maxW / srcImg.naturalWidth;
+    srcCanvas.width  = Math.round(srcImg.naturalWidth  * scale);
+    srcCanvas.height = Math.round(srcImg.naturalHeight * scale);
+
+    // Aloita: pienemmän mitan kokoinen neliö, keskellä
+    const minSide = Math.min(srcImg.naturalWidth, srcImg.naturalHeight);
+    cropW = cropH = minSide;
+    cropX = Math.round((srcImg.naturalWidth  - cropW) / 2);
+    cropY = Math.round((srcImg.naturalHeight - cropH) / 2);
+    drawAll();
+  }
+
+  function drawAll() {
+    srcCtx.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
+    srcCtx.drawImage(srcImg, 0, 0, srcCanvas.width, srcCanvas.height);
+
+    srcCtx.fillStyle = 'rgba(0,0,0,0.55)';
+    const cx = cropX * scale, cy = cropY * scale;
+    const cw = cropW * scale, ch = cropH * scale;
+    srcCtx.fillRect(0, 0, srcCanvas.width, cy);
+    srcCtx.fillRect(0, cy + ch, srcCanvas.width, srcCanvas.height - cy - ch);
+    srcCtx.fillRect(0, cy, cx, ch);
+    srcCtx.fillRect(cx + cw, cy, srcCanvas.width - cx - cw, ch);
+
+    // Kehys
+    srcCtx.strokeStyle = '#ffffff';
+    srcCtx.lineWidth = 2;
+    srcCtx.setLineDash([6, 3]);
+    srcCtx.strokeRect(cx + 1, cy + 1, cw - 2, ch - 2);
+    srcCtx.strokeStyle = '#ef4444';
+    srcCtx.setLineDash([]);
+    srcCtx.strokeRect(cx, cy, cw, ch);
+
+    // Kulmakahvat
+    drawHandle(cx, cy);
+    drawHandle(cx + cw, cy);
+    drawHandle(cx, cy + ch);
+    drawHandle(cx + cw, cy + ch);
+
+    // Esikatselu
+    prevCtx.clearRect(0, 0, TARGET_W, TARGET_H);
+    prevCtx.drawImage(srcImg, cropX, cropY, cropW, cropH, 0, 0, TARGET_W, TARGET_H);
+
+    // Info
+    document.getElementById('crop-info').textContent =
+      `x:${cropX} y:${cropY}  ${cropW}×${cropH} px → 512×512 px`;
+    const resEl = document.getElementById('res-info');
+    if (cropW < RES_OK_PX) {
+      resEl.innerHTML = `<span class="warn">⚠ Crop ${cropW}×${cropH} px on alle ${RES_OK_PX} px — laatu voi heiketä skaalauksessa</span>`;
+    } else {
+      resEl.innerHTML = `<span class="ok">✓ ${cropW}×${cropH} px on hyvä resoluutio</span>`;
+    }
+  }
+
+  function drawHandle(x, y) {
+    const s = HANDLE_SIZE;
+    srcCtx.fillStyle = '#ef4444';
+    srcCtx.fillRect(x - s/2, y - s/2, s, s);
+    srcCtx.strokeStyle = '#ffffff';
+    srcCtx.lineWidth = 2;
+    srcCtx.strokeRect(x - s/2, y - s/2, s, s);
+  }
+
+  // ── Hit-detection ─────────────────────────────────────────────
+  function hitTest(canvasX, canvasY) {
+    const cx = cropX * scale, cy = cropY * scale;
+    const cw = cropW * scale, ch = cropH * scale;
+    const s = HANDLE_SIZE;
+    const corners = [
+      { name: 'nw', x: cx,      y: cy      },
+      { name: 'ne', x: cx + cw, y: cy      },
+      { name: 'sw', x: cx,      y: cy + ch },
+      { name: 'se', x: cx + cw, y: cy + ch },
+    ];
+    for (const c of corners) {
+      if (Math.abs(canvasX - c.x) <= s && Math.abs(canvasY - c.y) <= s) return c.name;
+    }
+    if (canvasX >= cx && canvasX <= cx + cw && canvasY >= cy && canvasY <= cy + ch) return 'move';
+    return null;
+  }
+
+  // ── Pointer handlers (mouse + touch unified via Pointer Events) ─
+  function startInteraction(canvasX, canvasY, imgX, imgY) {
+    const hit = hitTest(canvasX, canvasY);
+    if (!hit) return false;
+    mode = hit;
+    startMX = imgX; startMY = imgY;
+    startCrop = { x: cropX, y: cropY, w: cropW, h: cropH };
+    return true;
+  }
+
+  function updateInteraction(imgX, imgY) {
+    if (!mode) return;
+    const dx = imgX - startMX;
+    const dy = imgY - startMY;
+    const W  = srcImg.naturalWidth;
+    const H  = srcImg.naturalHeight;
+
+    if (mode === 'move') {
+      cropX = Math.round(Math.max(0, Math.min(startCrop.x + dx, W - cropW)));
+      cropY = Math.round(Math.max(0, Math.min(startCrop.y + dy, H - cropH)));
+    } else {
+      // Resize — neliö pidetään aina, ankkuroidaan vastakulma
+      let anchorX, anchorY, signX, signY;
+      switch (mode) {
+        case 'nw': anchorX = startCrop.x + startCrop.w; anchorY = startCrop.y + startCrop.h; signX = -1; signY = -1; break;
+        case 'ne': anchorX = startCrop.x;               anchorY = startCrop.y + startCrop.h; signX =  1; signY = -1; break;
+        case 'sw': anchorX = startCrop.x + startCrop.w; anchorY = startCrop.y;               signX = -1; signY =  1; break;
+        case 'se': anchorX = startCrop.x;               anchorY = startCrop.y;               signX =  1; signY =  1; break;
+      }
+      // Hiiri-pikselin etäisyys ankkurista molemmissa suunnissa
+      const distX = (imgX - anchorX) * signX;
+      const distY = (imgY - anchorY) * signY;
+      // Neliö → ota suurempi etäisyys, mutta rajaa kuvan rajoihin
+      let side = Math.max(distX, distY);
+      // Rajat: ei alle minimin, ei yli kuvan reunan
+      const maxSide = Math.min(
+        signX > 0 ? W - anchorX : anchorX,
+        signY > 0 ? H - anchorY : anchorY
+      );
+      side = Math.max(MIN_CROP_PX, Math.min(side, maxSide));
+      cropW = cropH = Math.round(side);
+      cropX = Math.round(signX > 0 ? anchorX : anchorX - side);
+      cropY = Math.round(signY > 0 ? anchorY : anchorY - side);
+    }
+    drawAll();
+  }
+
+  function endInteraction() { mode = null; }
+
+  // ── Mouse ─────────────────────────────────────────────────────
+  srcCanvas.addEventListener('mousedown', e => {
+    const r = srcCanvas.getBoundingClientRect();
+    const cx = e.clientX - r.left, cy = e.clientY - r.top;
+    startInteraction(cx, cy, cx / scale, cy / scale);
+  });
+  document.addEventListener('mousemove', e => {
+    if (!mode) {
+      // Pelkkä cursor-hover
+      const r = srcCanvas.getBoundingClientRect();
+      const cx = e.clientX - r.left, cy = e.clientY - r.top;
+      const hit = (cx >= 0 && cy >= 0 && cx <= srcCanvas.width && cy <= srcCanvas.height) ? hitTest(cx, cy) : null;
+      if (hit === 'nw' || hit === 'se') srcCanvas.style.cursor = 'nwse-resize';
+      else if (hit === 'ne' || hit === 'sw') srcCanvas.style.cursor = 'nesw-resize';
+      else if (hit === 'move') srcCanvas.style.cursor = 'move';
+      else srcCanvas.style.cursor = 'default';
+      return;
+    }
+    const r = srcCanvas.getBoundingClientRect();
+    updateInteraction((e.clientX - r.left) / scale, (e.clientY - r.top) / scale);
+  });
+  document.addEventListener('mouseup', endInteraction);
+
+  // ── Touch ─────────────────────────────────────────────────────
+  srcCanvas.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    const r = srcCanvas.getBoundingClientRect();
+    const cx = t.clientX - r.left, cy = t.clientY - r.top;
+    if (startInteraction(cx, cy, cx / scale, cy / scale)) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchmove', e => {
+    if (!mode) return;
+    const t = e.touches[0];
+    const r = srcCanvas.getBoundingClientRect();
+    updateInteraction((t.clientX - r.left) / scale, (t.clientY - r.top) / scale);
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', endInteraction);
+
+  // ── Output blob ──────────────────────────────────────────────
+  function buildBlob() {
+    return new Promise(resolve => {
+      const out = document.createElement('canvas');
+      out.width = TARGET_W; out.height = TARGET_H;
+      out.getContext('2d').drawImage(srcImg, cropX, cropY, cropW, cropH, 0, 0, TARGET_W, TARGET_H);
+      out.toBlob(resolve, 'image/png');
+    });
+  }
+
+  function getFilename() {
+    return (document.getElementById('filename-input').value.trim() || 'splash-1') + '.png';
+  }
+
+  // ── Manual download ──────────────────────────────────────────
+  async function downloadResult() {
+    const blob = await buildBlob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = getFilename();
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ── Auto-save (File System Access API) ───────────────────────
+  // 1. kerta: pyytää käyttäjää valitsemaan img/splash/-kansion
+  // 2.+ kerta: tallentaa suoraan ilman dialogia
+  async function autoSaveResult() {
+    const filename = getFilename();
+    const blob = await buildBlob();
+
+    if (!('showDirectoryPicker' in window)) {
+      // Selain ei tue (Safari/iOS) → fallback download
+      alert('Selaimesi ei tue automaattista tallennusta. Käytä ⬇ Lataa-nappia.');
+      downloadResult();
+      return;
+    }
+
+    try {
+      // Hae cached handle IndexedDB:stä
+      if (!dirHandle) dirHandle = await getStoredDirHandle();
+
+      // Vahvista lupa
+      if (dirHandle) {
+        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+          const req = await dirHandle.requestPermission({ mode: 'readwrite' });
+          if (req !== 'granted') dirHandle = null;
+        }
+      }
+
+      // Pyydä kansio jos ei vielä haetu
+      if (!dirHandle) {
+        dirHandle = await window.showDirectoryPicker({
+          id: 'uppis-splash',
+          mode: 'readwrite',
+          startIn: 'documents',
+        });
+        await storeDirHandle(dirHandle);
+      }
+
+      // Kirjoita tiedosto
+      const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      const btn = document.getElementById('autosave-btn');
+      const orig = btn.textContent;
+      btn.textContent = `✓ Tallennettu ${filename}`;
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+    } catch (err) {
+      if (err.name === 'AbortError') return; // käyttäjä peruutti
+      console.error(err);
+      alert('Tallennus epäonnistui: ' + err.message);
+    }
+  }
+
+  // ── IndexedDB tallennus dirHandle:lle ────────────────────────
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('uppis-tools', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('handles');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function getStoredDirHandle() {
+    try {
+      const db = await openDB();
+      return await new Promise(r => {
+        const tx = db.transaction('handles', 'readonly');
+        const req = tx.objectStore('handles').get('splashDir');
+        req.onsuccess = () => r(req.result || null);
+        req.onerror = () => r(null);
+      });
+    } catch { return null; }
+  }
+  async function storeDirHandle(handle) {
+    try {
+      const db = await openDB();
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').put(handle, 'splashDir');
+    } catch {}
+  }
+
+  function resetTool() {
+    srcImg = null;
+    document.getElementById('editor').style.display = 'none';
+    document.getElementById('drop-zone').style.display = '';
+    document.getElementById('file-input').value = '';
+  }
+</script>
+</body>
+</html>

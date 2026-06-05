@@ -240,31 +240,29 @@ async function renderVertailuCharts() {
 
   if (myTeams.length > 0) {
     try {
-      const cKey = teamCacheKey(myTeams, weeks[0].getTime());
+      const cKey     = teamCacheKey(myTeams, weeks[0].getTime());
+      const cacheHit = teamCacheGet(currentUser.uid, cKey); // always check, regardless of filter
 
-      // When perf filter is active, skip cache and recompute from stored raw entries
-      const useCache = vertailuPerfFilter.length === 0;
-      const cached   = useCache ? teamCacheGet(currentUser.uid, cKey) : null;
-
-      if (cached && cached.memberEntries) {
-        // ── Served from cache (includes raw entries) ──────────
-        cachedTeamMemberEntries = cached.memberEntries;
-        teamAvgMinData  = cached.avgMins;
-        teamTopMinData  = cached.topMins;
-        teamAvgSessData = cached.avgSess;
-        teamTopSessData = cached.topSess;
-        hasTeamData     = cached.hasData;
-      } else if (useCache && cached && !cached.memberEntries) {
-        // ── Legacy cache format (no raw entries) — treat as miss ──
-        // Fall through to fetch below
-        cachedTeamMemberEntries = {};
+      if (cacheHit?.memberEntries) {
+        if (vertailuPerfFilter.length === 0) {
+          // ── No filter: serve fully pre-aggregated data from cache ──
+          cachedTeamMemberEntries = cacheHit.memberEntries;
+          teamAvgMinData  = cacheHit.avgMins;
+          teamTopMinData  = cacheHit.topMins;
+          teamAvgSessData = cacheHit.avgSess;
+          teamTopSessData = cacheHit.topSess;
+          hasTeamData     = cacheHit.hasData;
+        } else if (Object.keys(cachedTeamMemberEntries).length === 0) {
+          // ── Filter active: restore raw entries from cache, recompute below ──
+          cachedTeamMemberEntries = cacheHit.memberEntries;
+        }
       }
 
-      // Need to fetch: either no cache hit, or perf filter active but no raw entries in memory
-      const needFetch = !cached || !cached.memberEntries;
+      // Fetch from Firestore only when raw entries are unavailable
       const haveRawEntries = Object.keys(cachedTeamMemberEntries).length > 0;
+      const needFetch = !cacheHit?.memberEntries && !haveRawEntries;
 
-      if (needFetch && !haveRawEntries) {
+      if (needFetch) {
         // ── Fetch from Firestore ──────────────────────────────
         const usersSnap = await db.collection('users')
           .where('profile.teams', 'array-contains-any', myTeams)
@@ -299,9 +297,6 @@ async function renderVertailuCharts() {
         }
 
         hasTeamData = true;
-      } else if (cached && cached.memberEntries) {
-        // already handled above
-        hasTeamData = cached.hasData;
       }
 
       if (hasTeamData || Object.keys(cachedTeamMemberEntries).length > 0) {
@@ -410,20 +405,22 @@ async function renderVertailuCharts() {
       type: 'line',
       label: 'Eniten treenaava',
       data: topData,
-      borderColor: 'rgba(220,38,38,0.75)',
+      borderColor: 'rgba(255,140,0,1)',
       backgroundColor: 'transparent',
+      pointBackgroundColor: 'rgba(255,140,0,1)',
       fill: false, tension: 0.3, spanGaps: true,
-      pointRadius: 2, borderWidth: 2, borderDash: [4, 3],
+      pointRadius: 3, borderWidth: 2.5,
       order: 1,
     });
     datasets.push({
       type: 'line',
       label: 'Joukkueen keskiarvo',
       data: avgData,
-      borderColor: 'rgba(16,185,129,0.9)',
-      backgroundColor: 'rgba(16,185,129,0.15)',
-      fill: true, tension: 0.3, spanGaps: true,
-      pointRadius: 2, borderWidth: 2,
+      borderColor: 'rgba(160,160,160,1)',
+      backgroundColor: 'transparent',
+      pointBackgroundColor: 'rgba(160,160,160,1)',
+      fill: false, tension: 0.3, spanGaps: true,
+      pointRadius: 3, borderWidth: 2.5,
       order: 2,
     });
   }
@@ -441,8 +438,8 @@ async function renderVertailuCharts() {
   const legendItems = [
     { color: 'rgba(0,63,156,0.85)', label: ownLabel },
     ...(hasTeamData ? [
-      { color: 'rgba(16,185,129,0.9)', label: 'Joukkueen keskiarvo' },
-      { color: 'rgba(220,38,38,0.75)', label: 'Eniten treenaava' },
+      { color: 'rgba(160,160,160,1)',  label: 'Joukkueen keskiarvo' },
+      { color: 'rgba(255,140,0,1)',    label: 'Eniten treenaava' },
     ] : []),
   ];
   el('vertailu-legend').innerHTML = legendItems.map(item =>
@@ -511,6 +508,22 @@ async function renderTrenditCharts() {
     borderRadius: 2,
   }));
 
+  // Referenssiviiva minuuttitavoitteelle
+  const minutesGoal = userProfile.weeklyMinutesGoal || null;
+  if (minutesGoal) {
+    minutesDatasets.push({
+      type: 'line',
+      label: 'Tavoite',
+      data: Array(12).fill(minutesGoal),
+      borderColor: 'rgba(0,0,0,0.45)',
+      borderWidth: 1.5,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      fill: false,
+      order: -1,
+    });
+  }
+
   destroyChart('weeklyMinutes');
   chartInstances.weeklyMinutes = new Chart(
     el('chart-weekly-minutes').getContext('2d'),
@@ -522,6 +535,57 @@ async function renderTrenditCharts() {
         scales: {
           x: { ...chartBaseOptions.scales.x, stacked: true },
           y: { ...chartBaseOptions.scales.y, stacked: true },
+        },
+      },
+    }
+  );
+
+  // ── Stacked treenikerrat by performance level ──────────────
+  const countDatasets = PERF_ROMAN.map((roman, i) => ({
+    label: roman,
+    data: weeks.map(w => {
+      const n = (weekMap[w.getTime()] || []).filter(e => e.performance === i + 1).length;
+      return n || null;
+    }),
+    backgroundColor: PERF_COLORS[i],
+    borderRadius: 2,
+  }));
+
+  // Referenssiviiva treenikertataoitteelle
+  const sessionsGoal = userProfile.weeklySessionsGoal || null;
+  if (sessionsGoal) {
+    countDatasets.push({
+      type: 'line',
+      label: 'Tavoite',
+      data: Array(12).fill(sessionsGoal),
+      borderColor: 'rgba(0,0,0,0.45)',
+      borderWidth: 1.5,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      fill: false,
+      order: -1,
+    });
+  }
+
+  destroyChart('weeklyCount');
+  chartInstances.weeklyCount = new Chart(
+    el('chart-weekly-count').getContext('2d'),
+    {
+      type: 'bar',
+      data: { labels, datasets: countDatasets },
+      options: {
+        ...chartBaseOptions,
+        scales: {
+          x: { ...chartBaseOptions.scales.x, stacked: true },
+          y: {
+            ...chartBaseOptions.scales.y,
+            stacked: true,
+            ticks: {
+              ...chartBaseOptions.scales.y.ticks,
+              stepSize: 1,
+              precision: 0,
+            },
+          },
         },
       },
     }
@@ -563,6 +627,7 @@ async function renderTrenditCharts() {
             spanGaps: true,
             pointRadius: 3,
             pointHoverRadius: 5,
+            pointBackgroundColor: 'rgba(0,63,156,0.85)',
             borderWidth: 2,
             order: 2,
           },
@@ -621,6 +686,72 @@ async function renderTrenditCharts() {
   ].map(item =>
     `<span class="legend-item"><span class="legend-swatch" style="background:${item.color}"></span>${item.label}</span>`
   ).join('');
+
+  // ── Piirakat: tehoaluejakauma 12 vk ──────────────────────────
+  const totalMinByZone  = PERF_ROMAN.map((_, i) =>
+    weeks.reduce((sum, w) =>
+      sum + (weekMap[w.getTime()] || [])
+        .filter(e => e.performance === i + 1)
+        .reduce((s, e) => s + (e.duration || 0), 0), 0)
+  );
+  const totalCntByZone  = PERF_ROMAN.map((_, i) =>
+    weeks.reduce((sum, w) =>
+      sum + (weekMap[w.getTime()] || [])
+        .filter(e => e.performance === i + 1).length, 0)
+  );
+
+  const buildPieLegend = (legendId, totals) => {
+    const total = totals.reduce((s, v) => s + v, 0);
+    el(legendId).innerHTML = PERF_ROMAN.map((roman, i) => {
+      if (!totals[i]) return '';
+      const pct = Math.round(totals[i] / total * 100);
+      return `<div class="pie-legend-item">
+        <span class="pie-legend-swatch" style="background:${PERF_COLORS[i]}"></span>
+        <span class="pie-legend-label">${roman}</span>
+        <span class="pie-legend-pct">${pct}%</span>
+      </div>`;
+    }).join('');
+  };
+
+  const buildDoughnut = (chartId, totals, unit) => {
+    const total = totals.reduce((s, v) => s + v, 0);
+    destroyChart(chartId);
+    if (!total) return;
+    chartInstances[chartId] = new Chart(
+      el(chartId).getContext('2d'),
+      {
+        type: 'doughnut',
+        data: {
+          labels: PERF_ROMAN,
+          datasets: [{
+            data: totals.map(v => v || null),
+            backgroundColor: PERF_COLORS,
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          cutout: '58%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const v = ctx.parsed;
+                  const pct = Math.round(v / total * 100);
+                  return ` ${ctx.label}: ${v} ${unit} (${pct}%)`;
+                },
+              },
+            },
+          },
+        },
+      }
+    );
+  };
+
+  buildDoughnut('chart-pie-minutes', totalMinByZone,  'min');
+  buildDoughnut('chart-pie-count',   totalCntByZone,  'krt');
+  buildPieLegend('pie-minutes-legend', totalMinByZone);
+  buildPieLegend('pie-count-legend',   totalCntByZone);
 }
 
 // ============================================================
@@ -628,6 +759,388 @@ async function renderTrenditCharts() {
 // ============================================================
 function refreshActiveChart() {
   const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab;
+  if (activeTab !== 'trendit') return;
   // Vertailu fetches external team data — only re-render on explicit tab open, not on every own-entry refresh
-  if (activeTab === 'trendit') renderTrenditCharts();
+  const activeSub = document.querySelector('#trendit-sub-tabs .sub-tab.active')?.dataset.subtab || 'omat';
+  if (activeSub === 'omat') renderTrenditCharts();
+}
+
+// ============================================================
+// EWMA TRAINING LOAD  (Kuorma-välilehti — vain admin)
+// ============================================================
+
+let kuormaAtlCtlChart = null;
+let kuormaAcwrChart   = null;
+let kuormaZoneChart   = null;
+let kuormaZoneLoadChart = null;
+
+// Laske sessiokohtainen kuorma (AU = arbitrary units)
+function sessionLoadAU(entry) {
+  const dur = entry.duration || 0;
+  if (!dur) return 0;
+  const perf = entry.performance;
+  if (perf && perf >= 1 && perf <= 5) return ZONE_WEIGHTS[perf] * dur;
+  // Ei tehoaluetta — käytä lajin oletuspainoa
+  const w = SPORT_DEFAULT_WEIGHTS[entry.type] ?? SPORT_DEFAULT_WEIGHT_FALLBACK;
+  return w * dur;
+}
+
+// Laskee EWMA-historian päivätasolla 84 päivää taaksepäin (12 viikkoa)
+function calcEwmaHistory(entries) {
+  const λa = 2 / (7  + 1);  // 0.250 — akuutti (7 pv)
+  const λc = 2 / (28 + 1);  // 0.069 — krooninen (28 pv)
+
+  // Kerää päiväkohtaiset kuormat
+  const dailyLoad = {};
+  entries.forEach(e => {
+    const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+    const key = d.toISOString().slice(0, 10);
+    dailyLoad[key] = (dailyLoad[key] || 0) + sessionLoadAU(e);
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - 83); // 84 päivää = 12 viikkoa
+
+  let atl = 0, ctl = 0;
+  const history = [];
+
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const key  = d.toISOString().slice(0, 10);
+    const load = dailyLoad[key] || 0;
+    atl = λa * load + (1 - λa) * atl;
+    ctl = λc * load + (1 - λc) * ctl;
+    history.push({ date: new Date(d), atl, ctl, load });
+  }
+  return history;
+}
+
+// ACWR-väri ja status-teksti
+function acwrStatus(acwr) {
+  if (acwr === null || acwr === 0)   return { cls: 'acwr-status--na',     label: 'Ei dataa',        color: '#9CA3AF' };
+  if (acwr < 0.6)                    return { cls: 'acwr-status--low',    label: 'Alikuormitus',    color: '#3B82F6' };
+  if (acwr < 0.8)                    return { cls: 'acwr-status--low',    label: 'Kevyt jakso',     color: '#3B82F6' };
+  if (acwr <= 1.3)                   return { cls: 'acwr-status--ok',     label: 'Optimivyöhyke ✓', color: '#16a34a' };
+  if (acwr <= 1.5)                   return { cls: 'acwr-status--warn',   label: 'Tarkkaile ⚠',    color: '#F5A623' };
+  return                               { cls: 'acwr-status--danger',  label: 'Korkea kuorma 🔴', color: '#dc2626' };
+}
+
+async function renderKuormaTab() {
+  // Hae chart-data tarvittaessa (esim. heti impersonoinnin jälkeen kun
+  // allChartEntries on nollattu, tai jos Omat/Vertailu ei vielä käyty)
+  if (!allChartEntries.length) {
+    const acwrSec = el('kuorma-acwr-section');
+    if (acwrSec) acwrSec.innerHTML = '<p class="loading">Lasketaan…</p>';
+    await fetchChartEntries();
+  }
+  const entries = allChartEntries.length > 0 ? allChartEntries : [];
+
+  // ── Datalaatu ──
+  const dqSection = el('kuorma-dq-row');
+  if (dqSection && entries.length > 0) {
+    const withZone = entries.filter(e => e.performance >= 1).length;
+    const pct = Math.round((withZone / entries.length) * 100);
+    dqSection.innerHTML = `
+      <span class="kuorma-dq-label">Datalaatu</span>
+      <div class="kuorma-dq-bar-wrap">
+        <div class="kuorma-dq-bar-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="kuorma-dq-pct">${pct} %</span>
+      <span class="kuorma-dq-label">tehoalue kirjattu (loput arvioitu lajin mukaan)</span>`;
+  }
+
+  if (entries.length === 0) {
+    el('kuorma-acwr-section').innerHTML = '<p class="loading">Ei harjoitusdataa.</p>';
+    return;
+  }
+
+  const history = calcEwmaHistory(entries);
+  const last    = history[history.length - 1];
+  const acwr    = last.ctl > 0 ? last.atl / last.ctl : null;
+  const status  = acwrStatus(acwr);
+
+  // ── ACWR Gauge ──
+  const acwrVal   = acwr !== null ? acwr.toFixed(2) : '—';
+  const angleDeg  = acwr !== null ? Math.min(acwr / 2, 1) * 180 : 0; // 0–180° kaari
+  const acwrSec   = el('kuorma-acwr-section');
+  if (acwrSec) {
+    // Värisegmenttien pituudet kaaressa (kokonaispituus 157, vastaa arvoa 0–2.0)
+    // 0–0.8 sininen, 0.8–1.3 vihreä, 1.3–1.5 keltainen, 1.5–2.0 punainen
+    const arcLen = 157;
+    const seg = (from, to) => ({
+      len: ((to - from) / 2) * arcLen,
+      off: -((from / 2) * arcLen),
+    });
+    const sBlue   = seg(0,   0.8);
+    const sGreen  = seg(0.8, 1.3);
+    const sYellow = seg(1.3, 1.5);
+    const sRed    = seg(1.5, 2.0);
+
+    // Indikaattorin sijainti kaarella (ACWR 0–2 → 180°–0°)
+    const v = Math.min(Math.max(acwr || 0, 0), 2);
+    const theta = Math.PI * (1 - v / 2); // v=0 → π (vasen), v=2 → 0 (oikea)
+    const cx = 60 + 50 * Math.cos(theta);
+    const cy = 65 - 50 * Math.sin(theta);
+
+    acwrSec.innerHTML = `
+      <div class="kuorma-acwr-row">
+        <div class="kuorma-gauge-wrap">
+          <svg class="kuorma-gauge-svg" viewBox="0 0 120 75">
+            <!-- Värisegmentit kaaressa (ACWR-vyöhykkeet) -->
+            <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#60a5fa" stroke-width="10"
+              stroke-dasharray="${sBlue.len} ${arcLen}" stroke-dashoffset="${sBlue.off}"/>
+            <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#4ade80" stroke-width="10"
+              stroke-dasharray="${sGreen.len} ${arcLen}" stroke-dashoffset="${sGreen.off}"/>
+            <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#facc15" stroke-width="10"
+              stroke-dasharray="${sYellow.len} ${arcLen}" stroke-dashoffset="${sYellow.off}"/>
+            <path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#ef4444" stroke-width="10"
+              stroke-dasharray="${sRed.len} ${arcLen}" stroke-dashoffset="${sRed.off}"/>
+            <!-- Nykyisen arvon indikaattori -->
+            ${acwr !== null ? `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="6"
+              fill="white" stroke="${status.color}" stroke-width="3"/>` : ''}
+          </svg>
+          <div class="kuorma-gauge-center">
+            <span class="kuorma-gauge-val" style="color:${status.color}">${acwrVal}</span>
+            <span class="kuorma-gauge-lbl">ACWR</span>
+          </div>
+        </div>
+        <div class="kuorma-acwr-info">
+          <span class="kuorma-status-badge ${status.cls}">${status.label}</span>
+          <div class="kuorma-kpi-row">
+            <div class="kuorma-kpi"><span class="kuorma-kpi-label">ATL (7 pv)</span><span class="kuorma-kpi-val">${last.atl.toFixed(0)} AU</span></div>
+            <div class="kuorma-kpi"><span class="kuorma-kpi-label">CTL (28 pv)</span><span class="kuorma-kpi-val">${last.ctl.toFixed(0)} AU</span></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── ATL/CTL -kaavio ──
+  const weeks   = getLastNWeeks(12);
+  const _today  = new Date(); _today.setHours(0,0,0,0);
+  // Poimi yhden pisteen per viikko (viikon viimeinen päivä historiassa)
+  const weekPts = weeks.map(wStart => {
+    const wEnd = new Date(wStart);
+    wEnd.setDate(wEnd.getDate() + 6);
+    const pts = history.filter(h => h.date >= wStart && h.date <= wEnd);
+    return pts.length ? pts[pts.length - 1] : null;
+  });
+  // Tunnista kuluva (kesken oleva) viikko: viikko jonka loppupäivä on tulevaisuudessa
+  const currentWeekIdx = weeks.findIndex(wStart => {
+    const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
+    return _today >= wStart && _today <= wEnd;
+  });
+  const wLabels = weeks.map(w => {
+    const d = new Date(Date.UTC(w.getFullYear(), w.getMonth(), w.getDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return 'Vk ' + Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  });
+
+  if (kuormaAtlCtlChart) { kuormaAtlCtlChart.destroy(); kuormaAtlCtlChart = null; }
+  const atlCtlCtx = el('kuorma-atl-ctl-chart');
+  if (atlCtlCtx) {
+    kuormaAtlCtlChart = new Chart(atlCtlCtx, {
+      data: {
+        labels: wLabels,
+        datasets: [
+          {
+            type: 'line', label: 'ATL – akuutti (7 pv)',
+            data: weekPts.map(p => p ? Math.round(p.atl) : null),
+            borderColor: '#003F9C', backgroundColor: 'rgba(0,63,156,0.08)',
+            pointBackgroundColor: '#003F9C', pointBorderColor: '#003F9C',
+            borderWidth: 2, pointRadius: 3, tension: 0.35, fill: false, spanGaps: true,
+            order: 2,
+            segment: { borderDash: ctx => ctx.p1DataIndex === currentWeekIdx ? [5, 4] : undefined },
+          },
+          {
+            type: 'line', label: 'CTL – krooninen (28 pv)',
+            data: weekPts.map(p => p ? Math.round(p.ctl) : null),
+            borderColor: '#F5A623',
+            pointBackgroundColor: '#F5A623', pointBorderColor: '#F5A623',
+            borderWidth: 2, pointRadius: 3, tension: 0.35, fill: false, spanGaps: true,
+            order: 1,
+            segment: { borderDash: ctx => ctx.p1DataIndex === currentWeekIdx ? [5, 4] : undefined },
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 10, color: '#6B7280' } },
+          tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.parsed.y + ' AU' + (c.dataIndex === currentWeekIdx ? ' (kesken)' : '') } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9CA3AF' } },
+          y: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 10 }, color: '#9CA3AF' },
+               title: { display: true, text: 'AU', font: { size: 10 }, color: '#9CA3AF' } },
+        },
+      },
+    });
+  }
+
+  // ── ACWR ajan yli ──
+  // CTL (28 pv EWMA) tarvitsee ~28 päivää tasaantuakseen. Sitä ennen ATL/CTL on
+  // keinotekoisesti suuri → piilotetaan nuo viikot graafista automaattisesti.
+  const firstLoadDate = entries
+    .filter(e => sessionLoadAU(e) > 0)
+    .map(e => (e.date?.toDate ? e.date.toDate() : new Date(e.date)))
+    .sort((a, b) => a - b)[0] || null;
+  const ctlReadyDate = firstLoadDate
+    ? new Date(firstLoadDate.getTime() + 28 * 86400000)
+    : null;
+  // Raaka-arvo tooltipiin, leikattu (max 2.0) piirtoa varten — niin viiva pysyy graafin sisällä
+  const acwrRaw = weekPts.map(p => {
+    if (!p || p.ctl <= 0) return null;
+    if (ctlReadyDate && p.date < ctlReadyDate) return null; // CTL ei vielä tasaantunut
+    return +(p.atl / p.ctl).toFixed(2);
+  });
+  const acwrPts  = acwrRaw.map(v => v === null ? null : Math.min(v, 2.0));
+
+  if (kuormaAcwrChart) { kuormaAcwrChart.destroy(); kuormaAcwrChart = null; }
+  const acwrCtx = el('kuorma-acwr-chart');
+  if (acwrCtx) {
+    kuormaAcwrChart = new Chart(acwrCtx, {
+      data: {
+        labels: wLabels,
+        datasets: [
+          {
+            type: 'line', label: 'ACWR',
+            data: acwrPts,
+            borderColor: '#7C3AED', backgroundColor: 'rgba(124,58,237,0.06)',
+            borderWidth: 2, pointRadius: acwrPts.map(v => v !== null ? 4 : 0),
+            pointBackgroundColor: acwrPts.map(v => {
+              if (v === null) return 'transparent';
+              return acwrStatus(v).color;
+            }),
+            pointBorderColor: acwrPts.map(v => {
+              if (v === null) return 'transparent';
+              return acwrStatus(v).color;
+            }),
+            pointBorderWidth: 1,
+            tension: 0.35, fill: false, spanGaps: true,
+            segment: { borderDash: ctx => ctx.p1DataIndex === currentWeekIdx ? [5, 4] : undefined },
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => {
+            const raw = acwrRaw[c.dataIndex];
+            const suffix = c.dataIndex === currentWeekIdx ? ' (kesken)' : '';
+            return 'ACWR: ' + (raw !== null ? raw.toFixed(2) : '–') + suffix;
+          } } },
+          annotation: { /* Chart.js annotation plugin ei ole ladattu — käytetään viivoja manuaalisesti */ },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9CA3AF' } },
+          y: {
+            grid: { color: '#F3F4F6' },
+            ticks: { font: { size: 10 }, color: '#9CA3AF' },
+            min: 0, max: 2.0,
+            title: { display: true, text: 'ACWR', font: { size: 10 }, color: '#9CA3AF' },
+          },
+        },
+      },
+      plugins: [{
+        // Piirrä vyöhykeväritys taustalle
+        id: 'acwrZones',
+        beforeDraw(chart) {
+          const { ctx, chartArea: { left, right, top, bottom }, scales: { y } } = chart;
+          if (!y) return;
+          const toY = v => y.getPixelForValue(Math.min(v, y.max));
+          // Vaaleat täyssävyt (palettimaiset) — sininen / vihreä / keltainen / punainen
+          const pairs = [
+            { from: 0,   to: 0.8,  color: '#DBEAFE' }, // pale blue
+            { from: 0.8, to: 1.3,  color: '#DCFCE7' }, // pale green
+            { from: 1.3, to: 1.5,  color: '#FEF9C3' }, // pale yellow
+            { from: 1.5, to: 2.0,  color: '#FEE2E2' }, // pale red
+          ];
+          pairs.forEach(({ from, to, color }) => {
+            const y1 = toY(to);   // ylempi y-pikseli (pienempi luku)
+            const y2 = toY(from); // alempi y-pikseli (suurempi luku)
+            ctx.fillStyle = color;
+            ctx.fillRect(left, y1, right - left, Math.max(y2 - y1, 0));
+          });
+        },
+      }],
+    });
+  }
+
+  // ── Tehoaluejakauma (viimeiset 4 viikkoa) ──
+  const cutoff4w = new Date();
+  cutoff4w.setDate(cutoff4w.getDate() - 28);
+  const recent = entries.filter(e => {
+    const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+    return d >= cutoff4w;
+  });
+
+  const zoneMin  = [0, 0, 0, 0, 0, 0]; // indeksi 0 = ei tehoaluetta
+  const zoneLoad = [0, 0, 0, 0, 0, 0];
+  recent.forEach(e => {
+    const z = (e.performance >= 1 && e.performance <= 5) ? e.performance : 0;
+    zoneMin[z]  += (e.duration || 0);
+    zoneLoad[z] += sessionLoadAU(e);
+  });
+
+  // Käytä vain tehoalueet I-V (ohitetaan "ei aluetta" -indeksi 0)
+  const minByZone  = [zoneMin[1],  zoneMin[2],  zoneMin[3],  zoneMin[4],  zoneMin[5]];
+  const loadByZone = [zoneLoad[1], zoneLoad[2], zoneLoad[3], zoneLoad[4], zoneLoad[5]];
+
+  const buildKuormaLegend = (legendId, totals) => {
+    const container = el(legendId);
+    if (!container) return;
+    const total = totals.reduce((s, v) => s + v, 0);
+    container.innerHTML = PERF_ROMAN.map((roman, i) => {
+      if (!totals[i]) return '';
+      const pct = Math.round(totals[i] / total * 100);
+      return `<div class="pie-legend-item">
+        <span class="pie-legend-swatch" style="background:${PERF_COLORS[i]}"></span>
+        <span class="pie-legend-label">${roman}</span>
+        <span class="pie-legend-pct">${pct}%</span>
+      </div>`;
+    }).join('');
+  };
+
+  const buildKuormaDoughnut = (chartId, totals, unit, prevChart) => {
+    if (prevChart) prevChart.destroy();
+    const ctx = el(chartId);
+    if (!ctx) return null;
+    const total = totals.reduce((s, v) => s + v, 0);
+    if (!total) return null;
+    return new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: PERF_ROMAN,
+        datasets: [{
+          data: totals.map(v => v || null),
+          backgroundColor: PERF_COLORS,
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        cutout: '58%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: c => {
+                const v = c.parsed;
+                const pct = Math.round(v / total * 100);
+                return ` ${c.label}: ${v} ${unit} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  };
+
+  kuormaZoneChart     = buildKuormaDoughnut('kuorma-zone-chart',      minByZone,  'min', kuormaZoneChart);
+  kuormaZoneLoadChart = buildKuormaDoughnut('kuorma-zone-load-chart', loadByZone.map(v => Math.round(v)), 'AU', kuormaZoneLoadChart);
+  buildKuormaLegend('kuorma-zone-min-legend',  minByZone);
+  buildKuormaLegend('kuorma-zone-load-legend', loadByZone);
 }

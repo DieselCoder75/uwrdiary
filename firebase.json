@@ -1,10 +1,20 @@
 {
   "hosting": {
+    "site": "uwrdiary",
     "public": ".",
     "ignore": [
       "firebase.json",
+      "deploy.sh",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/sw.js",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-store" }
+        ]
+      }
     ]
   },
   "firestore": {

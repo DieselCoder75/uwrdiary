@@ -115,6 +115,19 @@ function dangerConfirm(message, confirmWord = 'Poista') {
 }
 
 // ============================================================
+// HAPTIC FEEDBACK
+// ============================================================
+function haptic(type = 'light') {
+  if (!navigator.vibrate) return;
+  switch (type) {
+    case 'light':   navigator.vibrate(8);         break; // nappi
+    case 'medium':  navigator.vibrate(18);        break; // tallenna / vahvista
+    case 'success': navigator.vibrate([10,40,10]); break; // onnistunut tallennus
+    case 'error':   navigator.vibrate([20,60,20]); break; // virhe
+  }
+}
+
+// ============================================================
 // TOAST NOTIFICATIONS
 // ============================================================
 function toast(message, type = 'error') {
