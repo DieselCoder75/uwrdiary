@@ -11,7 +11,7 @@ const AICOACH_LS_PREFIX = 'uppis_aicoach_';          // + uid
 const AICOACH_TTL       = 7 * 24 * 60 * 60 * 1000;    // 1 vko
 // Nosta tätä aina kun promptia muutetaan → vanha välimuisti mitätöityy ja
 // analyysi ajetaan uusiksi uudella promptilla seuraavalla avauksella.
-const AICOACH_PROMPT_VERSION = 3;
+const AICOACH_PROMPT_VERSION = 4;
 const AICOACH_VOIMA_TYPES = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 
 const AICOACH_ZONE_DESC = [
@@ -75,7 +75,21 @@ function aiCoachBuildContext() {
   const nextWeekZone = calPlannedZone(nextMon) || '–';
   const nextWeekNum  = calIsoWeekData(nextMon).week;
 
-  return { lines, entryCount: entries.length, nextWeekZone, nextWeekNum };
+  // Viimeisten 7 päivän treenimäärä (laskien viimeisimmästä kirjauksesta taaksepäin)
+  let recentSessionCount = 0;
+  if (entries.length) {
+    const lastDate = entries
+      .map(e => e.date?.toDate ? e.date.toDate() : new Date(e.date))
+      .reduce((max, d) => d > max ? d : max, new Date(0));
+    const cutoff = new Date(lastDate);
+    cutoff.setDate(cutoff.getDate() - 7);
+    recentSessionCount = entries.filter(e => {
+      const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+      return d >= cutoff && d <= lastDate;
+    }).length;
+  }
+
+  return { lines, entryCount: entries.length, nextWeekZone, nextWeekNum, recentSessionCount };
 }
 
 function aiCoachBuildPrompt() {
@@ -85,6 +99,8 @@ function aiCoachBuildPrompt() {
 
 PELAAJAN HARJOITUSDATA (vain muistissa oleva jakso, ${ctx.lines.length} viikkoa, vanhin ensin):
 ${ctx.lines.join('\n')}
+
+VIIMEISEN 7 PÄIVÄN TREENIKIRJAUKSET (laskien viimeisimmästä kirjauksesta taaksepäin): ${ctx.recentSessionCount} treeniä
 
 ENSI VIIKON (vk ${ctx.nextWeekNum}) SUUNNITELTU TEHOALUE: ${ctx.nextWeekZone}
 
@@ -99,10 +115,11 @@ TÄRKEÄÄ DATAN TULKINNASSA:
 - Keskity siihen jaksoon, jolta dataa selvästi on.
 
 OHJEET ANALYYSIIN:
+- Anna erityinen painoarvo viimeisimmälle 1–2 viikolle. Käytä vanhempaa dataa trendien vahvistamiseen ja pitkän aikavälin kokonaisuuden hahmottamiseen, mutta konkreettiset havainnot ja suositukset pohjaa ensisijaisesti tuoreimpaan dataan.
 - Arvioi viikoittainen harjoitusmäärä ja uppopallo/oheis-suhde suhteessa yllä olevaan suuntaa-antavaan jaotteluun.
 - Huomioi sisältyykö viikoittaiseen oheisharjoitteluun sekä uintia että voimaharjoittelua. Kannusta pitämään molemmat mukana.
 - Katso osuvatko kovat tehoaluetreenit kalenterin suunniteltuun tehoalueeseen.
-- Tarkista fiilis- ja kuorma (ACWR) -trendit. Jos fiilis on laskussa tai kuorma epäsuotuisalla tasolla (ACWR selvästi yli 1,3 tai jatkuvasti hyvin matala), nosta se esiin lempeästi ja anna konkreettinen vinkki palautumiseen.
+- Tarkista fiilis- ja kuorma (ACWR) -trendit. Jos fiilis on laskussa tai kuorma epäsuotuisalla tasolla (ACWR selvästi yli 1,3 tai jatkuvasti hyvin matala), nosta se esiin lempeästi ja anna konkreettinen vinkki palautumiseen.${ctx.recentSessionCount < 3 ? `\n- HUOMIO: Viimeisen 7 päivän kirjauksissa on vain ${ctx.recentSessionCount} treeni${ctx.recentSessionCount === 1 ? '' : 'ä'}. Kannusta motivoivasti ja lempeästi nostamaan viikoittaista treenimäärää – muistuta, että säännöllisyys on kehittymisen perusta.` : ''}
 - Suosituksissa huomioi ensi viikon suunniteltu tehoalue (yllä): ehdota mille tehoalueelle kovat vedot kannattaa ajoittaa.
 - Älä tee terveys- tai lääketieteellisiä väittämiä; puhu harjoittelusta.
 

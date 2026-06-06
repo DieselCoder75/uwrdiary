@@ -59,7 +59,7 @@ const req = https.request({
   });
 });
 
-req.on('error', (e) => { console.error('❌ Verkkovirhe:', e.message); process.exit(1); });
+req.on('error', (e) => { console.warn('⚠️  Token-refresh epäonnistui (verkko):', e.message, '— jatketaan olemassa olevalla tokenilla'); process.exit(0); });
 req.write(body);
 req.end();
 EOF
