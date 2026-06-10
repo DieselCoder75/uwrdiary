@@ -426,7 +426,7 @@ function showCalTooltip(cell) {
       html += `<div class="cal-tip-event">${item.label}<br><span class="cal-tip-dates">${item.dates}</span></div>`;
     } else {
       const parts = [];
-      if (item.type)     parts.push(item.type);
+      if (item.type)     parts.push(escapeHtml(item.type));
       if (item.perf)     parts.push(CAL_ROMAN[item.perf]);
       if (item.duration) parts.push(`${item.duration} min`);
       html += `<div class="cal-tip-entry">${parts.join(' · ')}</div>`;

@@ -754,8 +754,8 @@ async function adminExportPlayerCsv(uid, playerName, btn) {
 }
 
 function downloadCsv(rows, filename) {
-  const PERF = ['', 'I – Peruskestävyys', 'II – Kestävyys', 'III – Vauhti', 'IV – Maksimi', 'V – Kilpailu'];
-  const FEEL = ['', 'Erinomainen', 'Hyvä', 'Ok', 'Väsynyt', 'Todella väsynyt'];
+  const PERF = ['', 'I – Peruskunto', 'II – Kestävyys', 'III – Maksimikestävyys', 'IV – Nopeuskestävyys', 'V – Nopeus'];
+  const FEEL = ['', 'Erittäin väsynyt', 'Väsynyt', 'Normaali', 'Hyvä', 'Erinomainen'];
   const headers = ['Pelaaja','Päivämäärä','Aktiviteetti','Kesto (min)','Tehoalue','Fiilis','Matka (km)','Keskisyke (bpm)','Maksimisyke (bpm)','Kommentti'];
   const esc = v => { if (v == null || v === '') return ''; const s = String(v); return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s; };
   const lines = [headers.join(',')];

@@ -339,6 +339,7 @@ el('remove-avatar-btn').addEventListener('click', async () => {
 // Save profile
 el('profile-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (impersonating) return;
 
   const updated = {
     nickname:  el('profile-nickname').value.trim(),

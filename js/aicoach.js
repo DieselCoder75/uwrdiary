@@ -149,8 +149,9 @@ function aiCoachGetCached() {
   return null;
 }
 
-function aiCoachSetCached(text, ts) {
-  try { localStorage.setItem(aiCoachCacheKey(), JSON.stringify({ text, ts, pv: AICOACH_PROMPT_VERSION })); } catch {}
+function aiCoachSetCached(text, ts, uid) {
+  const key = uid ? AICOACH_LS_PREFIX + uid : aiCoachCacheKey();
+  try { localStorage.setItem(key, JSON.stringify({ text, ts, pv: AICOACH_PROMPT_VERSION })); } catch {}
 }
 
 // Kevyt ja turvallinen markdown→HTML (escapaa kaiken ensin)
@@ -218,6 +219,8 @@ async function aiCoachRun() {
   if (aiCoachBusy) return;
   const out = el('aicoach-output');
   const btn = el('aicoach-run-btn');
+  // Capture uid before any await — impersonation may change during async Gemini call
+  const capturedUid = (typeof viewUid === 'function' ? viewUid() : currentUser?.uid) || 'anon';
   if (!allChartEntries.length) await fetchChartEntries();
   if (!allChartEntries.length) {
     if (out) out.innerHTML = '<p class="aicoach-empty">Ei treenidataa analysoitavaksi.</p>';
@@ -232,7 +235,7 @@ async function aiCoachRun() {
     }
     const text = await window.geminiGenerate(aiCoachBuildPrompt());
     const ts   = Date.now();
-    aiCoachSetCached(text, ts);
+    aiCoachSetCached(text, ts, capturedUid);
     aiCoachShow(text, ts);
   } catch (err) {
     console.error('AI Coach:', err);

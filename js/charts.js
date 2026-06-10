@@ -857,7 +857,14 @@ async function renderKuormaTab() {
 
   const history = calcEwmaHistory(entries);
   const last    = history[history.length - 1];
-  const acwr    = last.ctl > 0 ? last.atl / last.ctl : null;
+  // Same warm-up guard as the chart graph: suppress gauge until CTL has 28 days to stabilise
+  const _gaugeFirstLoad = entries
+    .filter(e => sessionLoadAU(e) > 0)
+    .map(e => (e.date?.toDate ? e.date.toDate() : new Date(e.date)))
+    .sort((a, b) => a - b)[0] || null;
+  const _gaugeCtlReady  = _gaugeFirstLoad ? new Date(_gaugeFirstLoad.getTime() + 28 * 86400000) : null;
+  const acwr    = (last.ctl > 0 && (!_gaugeCtlReady || last.date >= _gaugeCtlReady))
+    ? last.atl / last.ctl : null;
   const status  = acwrStatus(acwr);
 
   // ── ACWR Gauge ──
