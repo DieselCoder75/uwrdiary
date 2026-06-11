@@ -138,7 +138,10 @@ async function fetchEntries() {
     const serialised = inWindowDocs.map(serialiseEntry);
     const cached     = Cache.get(viewUid(), cacheKey) || [];
 
-    if (Cache.fingerprint(serialised) !== Cache.fingerprint(cached)) {
+    // Also force update if result is empty but allEntries has stale data from previous user
+    const dataChanged = Cache.fingerprint(serialised) !== Cache.fingerprint(cached);
+    const stalePrev   = inWindowDocs.length === 0 && allEntries.length > 0;
+    if (dataChanged || stalePrev) {
       Cache.set(viewUid(), cacheKey, serialised);
       allEntries = inWindowDocs.map(doc => ({ id: doc.id, ...doc.data() }));
       refreshActiveChart();
@@ -430,8 +433,9 @@ function renderWeekSummaryCard() {
   }
 
   // ── Tavoiterenkaat ──────────────────────────────────────────
-  const minGoal  = userProfile?.weeklyMinutesGoal  || null;
-  const sessGoal = userProfile?.weeklySessionsGoal || null;
+  const _viewProfile = impersonating?.profile || userProfile;
+  const minGoal  = _viewProfile?.weeklyMinutesGoal  || null;
+  const sessGoal = _viewProfile?.weeklySessionsGoal || null;
 
   const goalsHtml = (minGoal || sessGoal) ? `
     <div class="wsc-goals">
@@ -500,8 +504,9 @@ function pastWeekSummaryHtml(docs, monday) {
     ? `<span class="wsc-zone-inline">${escapeHtml(zone)}${_pZoneName ? ` – ${escapeHtml(_pZoneName)}` : ''}</span>`
     : '<span></span>';
 
-  const _pMg = userProfile?.weeklyMinutesGoal  || null;
-  const _pSg = userProfile?.weeklySessionsGoal || null;
+  const _pViewProfile = impersonating?.profile || userProfile;
+  const _pMg = _pViewProfile?.weeklyMinutesGoal  || null;
+  const _pSg = _pViewProfile?.weeklySessionsGoal || null;
   const _pGoalsHtml = (_pMg || _pSg) ? `<div class="wsc-goals">
     ${_pMg ? _ringHtml(totalMin, _pMg, 'min', true) : ''}
     ${_pSg ? _ringHtml(count,    _pSg, 'krt', true) : ''}

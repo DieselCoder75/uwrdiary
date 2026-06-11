@@ -315,6 +315,10 @@ window.toggleReaction = async function toggleReaction(ownerUid, entryId, emoji, 
                     || null;
 
   // ── Optimistic UI update ──────────────────────────────────────
+  // Capture UI counts BEFORE optimistic update — used to guard inc(-1) from going negative
+  const _countBefore    = (() => { const c = btnEl.querySelector('.reaction-count'); return c ? (parseInt(c.textContent) || 0) : 0; })();
+  const _oldCountBefore = oldActiveBtn ? (() => { const c = oldActiveBtn.querySelector('.reaction-count'); return c ? (parseInt(c.textContent) || 0) : 0; })() : 0;
+
   const prevCached = myReactionsCache[cacheKey];
   const prevGlobal = myGlobalReactions[cacheKey];
   myReactionsCache[cacheKey] = isActive ? null : emoji;
@@ -330,14 +334,14 @@ window.toggleReaction = async function toggleReaction(ownerUid, entryId, emoji, 
     if (isActive) {
       // Remove reaction entirely
       batch.delete(reactionRef);
-      batch.update(entryRef, { [`reactionCounts.${emoji}`]: inc(-1) });
+      if (_countBefore > 0) batch.update(entryRef, { [`reactionCounts.${emoji}`]: inc(-1) });
       // Remove from own reactions map
       batch.update(myUserRef, { [`myReactions.${cacheKey}`]: fdel() });
     } else {
       // Add or switch — reactionRef is keyed by currentUser.uid so only one per user
       batch.set(reactionRef, { emoji, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
       const entryUpdates = { [`reactionCounts.${emoji}`]: inc(1) };
-      if (oldEmoji) entryUpdates[`reactionCounts.${oldEmoji}`] = inc(-1);
+      if (oldEmoji && _oldCountBefore > 0) entryUpdates[`reactionCounts.${oldEmoji}`] = inc(-1);
       batch.update(entryRef, entryUpdates);
       // Store in own user doc — no cross-user writes needed
       batch.set(myUserRef, { myReactions: { [cacheKey]: emoji } }, { merge: true });

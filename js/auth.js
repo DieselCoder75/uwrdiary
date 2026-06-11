@@ -281,7 +281,25 @@ auth.onAuthStateChanged(async (user) => {
     }
   } else {
     if (unsubEntries) unsubEntries();
-    userProfile = {};
+    // Reset all in-memory state so the next user starts clean
+    userProfile              = {};
+    impersonating            = null;
+    allEntries               = [];
+    allChartEntries          = [];
+    cachedTeamMemberEntries  = {};
+    // joukkue state
+    myGlobalReactions        = {};
+    myGlobalReactionsLoaded  = false;
+    joukkueFeedItems         = [];
+    joukkueFeedRendered      = 0;
+    joukkueAvatarCache       = {};
+    joukkueFeedCacheTs       = 0;
+    joukkueFeedCacheData     = null;
+    Object.keys(myReactionsCache).forEach(k => delete myReactionsCache[k]);
+    // admin state
+    cachedAdminUsers         = null;
+    cachedAdminUsersTs       = 0;
+    calLoadedForUid          = null;
     localStorage.removeItem(SPLASH_LS_KEY);
     localStorage.removeItem(FIRSTNAME_LS_KEY);
     const g = document.getElementById('auth-greeting');
