@@ -1077,6 +1077,9 @@ el('entry-form').addEventListener('submit', async (e) => {
     }
 
     // Synkkaa profile-cache (records muuttui paikallisesti)
+    if (recordsUpdate && (recordsUpdate._needsLongestRescan || recordsUpdate._needsFirstRescan)) {
+      try { await rescanLongestAndFirst(); } catch (e) { console.warn('rescan failed:', e); }
+    }
     if (recordsUpdate) syncRecordsCache();
 
     // Invalidate caches and re-fetch

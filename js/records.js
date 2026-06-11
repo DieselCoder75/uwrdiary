@@ -60,19 +60,19 @@ async function buildRecordsUpdate(op, oldData, newData) {
   const r = userProfile.records;
   const updates = {};
   const FV = firebase.firestore.FieldValue;
+  // Accumulate per-weekKey deltas so same-week edit doesn't overwrite FV.increment calls
+  const weekDeltas = {};
 
-  // Apu: laske delta sekä päivitä paikallinen userProfile-kopio
   function applyDelta(weekKey, dSessions, dMinutes, dUppoMinutes) {
-    const path = `records.weeks.${weekKey}`;
     if (!r.weeks) r.weeks = {};
     if (!r.weeks[weekKey]) r.weeks[weekKey] = { sessions: 0, minutes: 0, uppoMinutes: 0 };
     r.weeks[weekKey].sessions    += dSessions;
     r.weeks[weekKey].minutes     += dMinutes;
     r.weeks[weekKey].uppoMinutes += dUppoMinutes;
-    // Increments dotted path — atominen
-    updates[`${path}.sessions`]    = FV.increment(dSessions);
-    updates[`${path}.minutes`]     = FV.increment(dMinutes);
-    updates[`${path}.uppoMinutes`] = FV.increment(dUppoMinutes);
+    if (!weekDeltas[weekKey]) weekDeltas[weekKey] = { sessions: 0, minutes: 0, uppoMinutes: 0 };
+    weekDeltas[weekKey].sessions    += dSessions;
+    weekDeltas[weekKey].minutes     += dMinutes;
+    weekDeltas[weekKey].uppoMinutes += dUppoMinutes;
   }
 
   // ─── Add ────────────────────────────────────────────────
@@ -83,24 +83,18 @@ async function buildRecordsUpdate(op, oldData, newData) {
       updates['records.totalMinutes'] = FV.increment(e.duration);
       r.totalEntries = (r.totalEntries || 0) + 1;
       r.totalMinutes = (r.totalMinutes || 0) + e.duration;
-      // Ensimmäinen treeni
       if (!r.firstEntryDate || e.date < (r.firstEntryDate.toDate ? r.firstEntryDate.toDate() : new Date(r.firstEntryDate))) {
         const ts = firebase.firestore.Timestamp.fromDate(e.date);
         updates['records.firstEntryDate'] = ts;
         r.firstEntryDate = ts;
       }
-      // Pisin
       if (!r.longestEntry || e.duration > r.longestEntry.duration) {
-        const longest = {
-          duration: e.duration,
-          date: firebase.firestore.Timestamp.fromDate(e.date),
-          type: e.type,
-        };
+        const longest = { duration: e.duration, date: firebase.firestore.Timestamp.fromDate(e.date), type: e.type };
         updates['records.longestEntry'] = longest;
         r.longestEntry = longest;
       }
     }
-    applyDelta(e.weekKey, op === 'add' ? 1 : 1, e.duration, e.isUppo ? e.duration : 0);
+    applyDelta(e.weekKey, 1, e.duration, e.isUppo ? e.duration : 0);
   }
 
   // ─── Remove (myös editissä, vanhan poisto) ──────────────
@@ -112,21 +106,61 @@ async function buildRecordsUpdate(op, oldData, newData) {
       r.totalEntries = Math.max(0, (r.totalEntries || 0) - 1);
       r.totalMinutes = Math.max(0, (r.totalMinutes || 0) - e.duration);
     }
-    applyDelta(e.weekKey, op === 'remove' ? -1 : -1, -e.duration, e.isUppo ? -e.duration : 0);
-
-    // Jos poistettava entry on nykyinen pisin → tarvitaan rescan
+    applyDelta(e.weekKey, -1, -e.duration, e.isUppo ? -e.duration : 0);
     if (op === 'remove' && r.longestEntry &&
-        Math.abs(r.longestEntry.duration - e.duration) === 0 &&
+        r.longestEntry.duration === e.duration &&
         sameDay(r.longestEntry.date, e.date) &&
         r.longestEntry.type === e.type) {
-      // Merkitsee kaipaavan rescania — kerää kaikki entryt myöhemmin
       updates._needsLongestRescan = true;
     }
-    // Sama firstEntryDate:lle
     if (op === 'remove' && r.firstEntryDate && sameDay(r.firstEntryDate, e.date)) {
       updates._needsFirstRescan = true;
     }
   }
+
+  // ─── Edit: totalMinutes, longestEntry, firstEntryDate ───
+  if (op === 'edit') {
+    const newE = _entrySnap(newData);
+    const oldE = _entrySnap(oldData);
+
+    const dMin = newE.duration - oldE.duration;
+    if (dMin !== 0) {
+      updates['records.totalMinutes'] = FV.increment(dMin);
+      r.totalMinutes = Math.max(0, (r.totalMinutes || 0) + dMin);
+    }
+
+    if (newE.duration >= (r.longestEntry?.duration || 0)) {
+      const longest = { duration: newE.duration, date: firebase.firestore.Timestamp.fromDate(newE.date), type: newE.type };
+      updates['records.longestEntry'] = longest;
+      r.longestEntry = longest;
+    } else if (r.longestEntry &&
+               r.longestEntry.duration === oldE.duration &&
+               sameDay(r.longestEntry.date, oldE.date) &&
+               r.longestEntry.type === oldE.type) {
+      updates._needsLongestRescan = true;
+    }
+
+    const newTime = newE.date.getTime();
+    const oldTime = oldE.date.getTime();
+    if (newTime !== oldTime) {
+      const curFirst = r.firstEntryDate?.toDate ? r.firstEntryDate.toDate().getTime() : null;
+      if (curFirst === null || newTime < curFirst) {
+        const ts = firebase.firestore.Timestamp.fromDate(newE.date);
+        updates['records.firstEntryDate'] = ts;
+        r.firstEntryDate = ts;
+      } else if (curFirst !== null && oldTime === curFirst) {
+        updates._needsFirstRescan = true;
+      }
+    }
+  }
+
+  // ─── Viimeistele viikko-incrementit (1 FV.increment per avain) ─
+  Object.entries(weekDeltas).forEach(([weekKey, d]) => {
+    const path = `records.weeks.${weekKey}`;
+    updates[`${path}.sessions`]    = FV.increment(d.sessions);
+    updates[`${path}.minutes`]     = FV.increment(d.minutes);
+    updates[`${path}.uppoMinutes`] = FV.increment(d.uppoMinutes);
+  });
 
   return updates;
 }

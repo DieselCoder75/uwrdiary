@@ -6,21 +6,22 @@ async function loadProfile() {
     const snap = await getUserDoc().get();
     const remoteProfile = snap.exists ? (snap.data().profile || {}) : {};
     const remoteEmail   = snap.exists ? snap.data().email : null;
-    // coachOf lives at root of user doc (not inside profile)
+    // coachOf and records live at root of user doc (not inside profile)
     const remoteCoachOf = snap.exists ? (snap.data().coachOf || []) : [];
+    const remoteRecords = snap.exists ? (snap.data().records || null) : null;
 
     // Only write email to Firestore if it's missing or changed (saves a write on most logins)
     if (remoteEmail !== currentUser.email) {
       getUserDoc().set({ email: currentUser.email }, { merge: true });
     }
 
-    // Update cache only if data actually changed
+    // Update cache only if profile data actually changed
     const cached = Cache.get(currentUser.uid, 'profile');
-    if (Cache.fingerprint(remoteProfile) !== Cache.fingerprint(cached)) {
-      Cache.set(currentUser.uid, 'profile', remoteProfile);
+    if (Cache.fingerprint(remoteProfile) !== Cache.fingerprint(cached?.coachOf !== undefined ? Object.fromEntries(Object.entries(cached).filter(([k]) => k !== 'coachOf' && k !== 'records')) : cached)) {
+      Cache.set(currentUser.uid, 'profile', { ...remoteProfile, coachOf: remoteCoachOf, records: remoteRecords });
     }
 
-    userProfile = { ...remoteProfile, coachOf: remoteCoachOf };
+    userProfile = { ...remoteProfile, coachOf: remoteCoachOf, records: remoteRecords };
 
     // Cache firstName for splash-screen greeting (auth.js lukee tämän heti)
     const greetName = remoteProfile.nickname || remoteProfile.firstName || '';
