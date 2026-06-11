@@ -22,6 +22,18 @@ function getUserEntries() {
   return getViewDoc().collection('entries');
 }
 
+// Odota Firestore-kirjoituksen serverikuittausta enintään ms millisekuntia.
+// Palauttaa true jos serveri kuittasi, false jos kirjoitus jäi paikalliseen jonoon
+// (offline tai hidas yhteys — persistence synkkaa sen automaattisesti).
+// Käytetään timeout-racena eikä navigator.onLine-tarkistuksena, koska
+// navigator.onLine voi olla true vaikka oikeaa nettiyhteyttä ei ole (salihalli-wifi).
+function awaitWriteAck(promise, ms = 4000) {
+  return Promise.race([
+    promise.then(() => true, () => true),
+    new Promise(res => setTimeout(() => res(false), ms)),
+  ]);
+}
+
 // Serialise a Firestore doc to plain JSON (Timestamps → millis)
 function serialiseEntry(doc) {
   const d = doc.data();
@@ -1051,6 +1063,7 @@ el('entry-form').addEventListener('submit', async (e) => {
         )
       : null;
 
+    let writePromise;
     if (currentEntryId) {
       // EDIT: yritä batch jos records-päivitys mukana
       if (recordsUpdate && Object.keys(recordsUpdate).filter(k => !k.startsWith('_')).length) {
@@ -1058,9 +1071,9 @@ el('entry-form').addEventListener('submit', async (e) => {
         batch.update(getUserEntries().doc(currentEntryId), data);
         const cleanUpdates = Object.fromEntries(Object.entries(recordsUpdate).filter(([k]) => !k.startsWith('_')));
         batch.update(getUserDoc(), cleanUpdates);
-        await batch.commit();
+        writePromise = batch.commit();
       } else {
-        await getUserEntries().doc(currentEntryId).update(data);
+        writePromise = getUserEntries().doc(currentEntryId).update(data);
       }
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
@@ -1070,15 +1083,27 @@ el('entry-form').addEventListener('submit', async (e) => {
         batch.set(newRef, data);
         const cleanUpdates = Object.fromEntries(Object.entries(recordsUpdate).filter(([k]) => !k.startsWith('_')));
         batch.update(getUserDoc(), cleanUpdates);
-        await batch.commit();
+        writePromise = batch.commit();
       } else {
-        await getUserEntries().add(data);
+        writePromise = getUserEntries().add(data);
       }
     }
 
+    // Aito kirjoitusvirhe (esim. säännöt hylkää) tulee vasta kuittauksessa — logaa se silloin
+    writePromise.catch(err => {
+      console.error('entry write failed on sync:', err);
+      toast('⚠️ Treenin synkronointi epäonnistui — tarkista kirjaus', 'error');
+    });
+
+    const acked = await awaitWriteAck(writePromise);
+
     // Synkkaa profile-cache (records muuttui paikallisesti)
     if (recordsUpdate && (recordsUpdate._needsLongestRescan || recordsUpdate._needsFirstRescan)) {
-      try { await rescanLongestAndFirst(); } catch (e) { console.warn('rescan failed:', e); }
+      if (acked) {
+        try { await rescanLongestAndFirst(); } catch (e) { console.warn('rescan failed:', e); }
+      } else {
+        writePromise.then(() => rescanLongestAndFirst()).catch(e => console.warn('deferred rescan failed:', e));
+      }
     }
     if (recordsUpdate) syncRecordsCache();
 
@@ -1092,10 +1117,10 @@ el('entry-form').addEventListener('submit', async (e) => {
     else ennatyksetLoaded = false; // pakota re-render fast-pathilla
     closeModal();
     haptic('success');
-    if (!navigator.onLine && !currentEntryId) {
-      const cur = parseInt(localStorage.getItem('uppis_pending_count') || '0', 10);
-      localStorage.setItem('uppis_pending_count', String(cur + 1));
-      toast('📵 Treenikirjaus tallennettu jonoon', 'success');
+    if (!acked) {
+      setPendingCount(getPendingCount() + 1);
+      writePromise.then(() => setPendingCount(Math.max(0, getPendingCount() - 1)));
+      toast('📵 Tallennettu jonoon — synkataan kun yhteys palaa', 'success');
     } else {
       toast(currentEntryId ? 'Treeni päivitetty.' : 'Treeni tallennettu!', 'success');
     }
@@ -1124,19 +1149,31 @@ el('delete-entry-btn').addEventListener('click', async () => {
       ? await buildRecordsUpdate('remove', originalEntryData, null)
       : null;
 
+    let writePromise;
     if (recordsUpdate && Object.keys(recordsUpdate).filter(k => !k.startsWith('_')).length) {
       const batch = db.batch();
       batch.delete(getUserEntries().doc(currentEntryId));
       const cleanUpdates = Object.fromEntries(Object.entries(recordsUpdate).filter(([k]) => !k.startsWith('_')));
       batch.update(getUserDoc(), cleanUpdates);
-      await batch.commit();
+      writePromise = batch.commit();
     } else {
-      await getUserEntries().doc(currentEntryId).delete();
+      writePromise = getUserEntries().doc(currentEntryId).delete();
     }
 
-    // Jos pisin tai ensimmäinen entry poistettiin → rescan (1-2 readia, harvinainen)
+    writePromise.catch(err => {
+      console.error('entry delete failed on sync:', err);
+      toast('⚠️ Poiston synkronointi epäonnistui', 'error');
+    });
+
+    const acked = await awaitWriteAck(writePromise);
+
+    // Jos pisin tai ensimmäinen entry poistettiin → rescan
     if (recordsUpdate && (recordsUpdate._needsLongestRescan || recordsUpdate._needsFirstRescan)) {
-      try { await rescanLongestAndFirst(); } catch (e) { console.warn('rescan failed:', e); }
+      if (acked) {
+        try { await rescanLongestAndFirst(); } catch (e) { console.warn('rescan failed:', e); }
+      } else {
+        writePromise.then(() => rescanLongestAndFirst()).catch(e => console.warn('deferred rescan failed:', e));
+      }
     }
     if (recordsUpdate) syncRecordsCache();
 
@@ -1148,6 +1185,11 @@ el('delete-entry-btn').addEventListener('click', async () => {
     else ennatyksetLoaded = false;
     haptic('medium');
     closeModal();
+    if (!acked) {
+      setPendingCount(getPendingCount() + 1);
+      writePromise.then(() => setPendingCount(Math.max(0, getPendingCount() - 1)));
+      toast('📵 Poisto jonossa — synkataan kun yhteys palaa', 'success');
+    }
     fetchEntries();
   } catch (err) {
     console.error(err);
