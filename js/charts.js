@@ -786,15 +786,20 @@ function sessionLoadAU(entry) {
 }
 
 // Laskee EWMA-historian päivätasolla 84 päivää taaksepäin (12 viikkoa)
+// Paikallinen päiväavain (YYYY-MM-DD) — välttää UTC vs. paikallinen aikavyöhyke -bugin
+function _localDayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function calcEwmaHistory(entries) {
   const λa = 2 / (7  + 1);  // 0.250 — akuutti (7 pv)
   const λc = 2 / (28 + 1);  // 0.069 — krooninen (28 pv)
 
-  // Kerää päiväkohtaiset kuormat
+  // Kerää päiväkohtaiset kuormat — käytä paikallista päivää, ei UTC:tä
   const dailyLoad = {};
   entries.forEach(e => {
     const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
-    const key = d.toISOString().slice(0, 10);
+    const key = _localDayKey(d);
     dailyLoad[key] = (dailyLoad[key] || 0) + sessionLoadAU(e);
   });
 
@@ -807,7 +812,7 @@ function calcEwmaHistory(entries) {
   const history = [];
 
   for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
-    const key  = d.toISOString().slice(0, 10);
+    const key  = _localDayKey(d);
     const load = dailyLoad[key] || 0;
     atl = λa * load + (1 - λa) * atl;
     ctl = λc * load + (1 - λc) * ctl;
