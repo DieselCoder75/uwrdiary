@@ -4,7 +4,13 @@
     "public": ".",
     "ignore": [
       "firebase.json",
+      "firestore.rules",
+      "CLAUDE.md",
       "deploy.sh",
+      "serve.sh",
+      "serve.py",
+      "mockup-*.html",
+      "tools/**",
       "**/.*",
       "**/node_modules/**"
     ],

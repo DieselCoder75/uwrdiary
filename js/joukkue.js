@@ -34,7 +34,7 @@ function joukkueFeedItemHtml(item, myReaction, avatarCache) {
   const memberName = profile.nickname || profile.firstName || profile.email || 'Pelaaja';
   const initials   = (profile.firstName?.[0] || profile.email?.[0] || '?').toUpperCase();
   const avatarSrc  = profile.photoURL || avatarCache[ownerUid];
-  const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" alt="">` : initials;
+  const avatarHtml = avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="">` : initials;
 
   const dateStr = entry.date?.toMillis ? formatDisplayDate(entry.date) : '—';
 

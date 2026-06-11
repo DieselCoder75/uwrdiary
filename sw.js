@@ -1,7 +1,7 @@
 // ============================================================
 // UWR Diary — Service Worker
 // ============================================================
-const CACHE_NAME = 'uwr-diary-v180';
+const CACHE_NAME = 'uwr-diary-v181';
 
 // Pre-cache only the HTML shell.
 // All other assets (CSS, JS, images) are cached on first request.
