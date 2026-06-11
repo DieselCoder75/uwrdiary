@@ -714,6 +714,21 @@ async function renderEnnatykset() {
       return;
     }
 
+    // Self-bootstrap: koko historia on jo luettu — kirjoita aggregaatti talteen,
+    // jotta seuraavat avaukset käyttävät fast pathia (0 entry-readia).
+    // Huom: !impersonating-ehto on kriittinen — getUserDoc() on AINA oma doc,
+    // joten ilman sitä admin kirjoittaisi pelaajan tilastot omaan records-kenttäänsä.
+    if (!impersonating && !userProfile?.records?.bootstrapped) {
+      try {
+        const rec = computeRecordsFromEntries(entries);
+        await getUserDoc().update({ records: rec });
+        userProfile.records = { ...rec, bootstrappedAt: null };
+        syncRecordsCache();
+      } catch (err) {
+        console.warn('records bootstrap failed:', err);
+      }
+    }
+
     // ── Kokonaistilastot ─────────────────────────────────────
     const totalEntries = entries.length;
     const totalMinutes = entries.reduce((sum, e) => sum + e.duration, 0);
