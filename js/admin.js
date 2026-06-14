@@ -1287,6 +1287,33 @@ const _ZONE_DATA = {
       },
     ],
   },
+  // Yhdistelmä I–II (peruskunto + kestävyys). String-avain käytetään ennen yksittäistä
+  // numeroa _viikkoohjeZoneHtml-resolverissa.
+  'I–II': {
+    name: 'Peruskunto / Kestävyys',
+    intro: 'Tällä viikolla teemana on <strong>peruskunto ja kestävyys</strong>. Viikon ydin on rauhallinen, aerobinen pohjatyö – I-alueen harjoitukset tukevat palautumista ja rakentavat kestävyyspohjaa, josta kaikki kovempi harjoittelu ammentaa. II-alueen reippaammat treenit täydentävät viikkoa sopivan vireyden mukaan, mutta <strong>peruskunto on pääosassa</strong>.<br><br>🔹 <strong>Peruskunto (I-alue)</strong> = rauhallista, pitkäkestoista tekemistä. Syke pysyy hallinnassa. Tukee palautumista ja rakentaa aerobista pohjaa.<br><br>🔹 <strong>Kestävyys (II-alue)</strong> = yhtäjaksoista tai pidempinä vetoina tehtävää reipasta työtä. Syke nousee selvästi peruskuntoaluetta korkeammalle, mutta tekeminen pysyy hallittuna ja maitohapot eivät pysäytä tekemistä. Tämä kehittää kykyä tehdä pitkäkestoista työtä ja palautua kuormituksesta.',
+    sections: [
+      {
+        title: 'Peruskuntotreeni (I-alue)',
+        subtitle: 'Syke 50–70 % maksimista',
+        items: [
+          '✅ Kevyt uinti',
+          '✅ Rauhallinen pyöräily',
+          '✅ Kävely tai kevyt hölkkä',
+          '✅ Liikkuvuus ja kehonhuolto',
+        ],
+      },
+      {
+        title: 'Kestävyystreeni (II-alue)',
+        subtitle: 'Syke 60–80 % maksimista',
+        preText: 'Alla esimerkkejä pääsarjoista. Rinnalla voi olla myös useampi samantyyppinen tai hieman kevennetty sarja.',
+        items: [
+          '✅ Uinti: pääsarja esim. 4 × 400 m (potkuja ja uintia vuorotellen reippaalla vauhdilla), 1–2 min palautus',
+          '✅ Juoksu / pyöräily / melonta: vähintään 35–45 min yhtämittainen reipas lenkki tasaisella teholla',
+        ],
+      },
+    ],
+  },
   5: {
     name: 'Nopeus',
     intro: 'Tällä viikolla teemana on <strong>nopeus</strong>, eli <strong>räjähtäviä alle 10 sekunnin maksimisuorituksia</strong> erittäin pitkillä palautuksilla. Tavoitteena on <strong>1–2 laadukasta harjoitusta</strong>. Lepoa enemmän kuin normaalisti – hermosto on etusijalla.',
@@ -1317,7 +1344,7 @@ const _ZONE_DATA = {
 function _viikkoohjeZoneHtml(zoneStr) {
   const zones = typeof parseZoneStr === 'function' ? parseZoneStr(zoneStr) : [];
   const primaryIdx = zones.length ? Math.max(...zones) : 0;
-  const data = _ZONE_DATA[primaryIdx];
+  const data = _ZONE_DATA[zoneStr] || _ZONE_DATA[primaryIdx];
   if (!data) return `<p>Ei sisältöä tehoalueelle ${escapeHtml(zoneStr)}.</p>`;
 
   const sectionsHtml = data.sections.map(s => {
