@@ -1291,11 +1291,12 @@ const _ZONE_DATA = {
   // numeroa _viikkoohjeZoneHtml-resolverissa.
   'I–II': {
     name: 'Peruskunto / Kestävyys',
-    intro: 'Tällä viikolla teemana on <strong>peruskunto ja kestävyys</strong>. Viikon ydin on rauhallinen, aerobinen pohjatyö – I-alueen harjoitukset tukevat palautumista ja rakentavat kestävyyspohjaa, josta kaikki kovempi harjoittelu ammentaa. II-alueen reippaammat treenit täydentävät viikkoa sopivan vireyden mukaan, mutta <strong>peruskunto on pääosassa</strong>.<br><br>🔹 <strong>Peruskunto (I-alue)</strong> = rauhallista, pitkäkestoista tekemistä. Syke pysyy hallinnassa. Tukee palautumista ja rakentaa aerobista pohjaa.<br><br>🔹 <strong>Kestävyys (II-alue)</strong> = yhtäjaksoista tai pidempinä vetoina tehtävää reipasta työtä. Syke nousee selvästi peruskuntoaluetta korkeammalle, mutta tekeminen pysyy hallittuna ja maitohapot eivät pysäytä tekemistä. Tämä kehittää kykyä tehdä pitkäkestoista työtä ja palautua kuormituksesta.',
+    intro: 'Seuraavalla kahdella viikolla teemana on peruskunto ja kestävyys. Viikon ydin on rauhallinen, aerobinen pohjatyö. I-alueen harjoitukset tukevat palautumista ja rakentavat kestävyyspohjaa, josta kaikki kovempi harjoittelu ammentaa. II-alueen reippaammat treenit täydentävät viikkoa sopivan vireyden mukaan, mutta peruskunto on pääosassa.<br><br>🔹 Peruskunto (I-alue) = rauhallista, pitkäkestoista tekemistä. Syke pysyy hallinnassa. Tukee palautumista ja rakentaa aerobista pohjaa.<br>🔹 Kestävyys (II-alue) = yhtäjaksoista tai pidempinä vetoina tehtävää reipasta työtä. Syke nousee selvästi peruskuntoaluetta korkeammalle, mutta tekeminen pysyy hallittuna ja maitohapot eivät pysäytä tekemistä. Tämä kehittää kykyä tehdä pitkäkestoista työtä ja palautua kuormituksesta.',
     sections: [
       {
         title: 'Peruskuntotreeni (I-alue)',
         subtitle: 'Syke 50–70 % maksimista',
+        preText: 'Alla esimerkkejä I-alueen treeneistä:',
         items: [
           '✅ Kevyt uinti',
           '✅ Rauhallinen pyöräily',
@@ -1306,7 +1307,7 @@ const _ZONE_DATA = {
       {
         title: 'Kestävyystreeni (II-alue)',
         subtitle: 'Syke 60–80 % maksimista',
-        preText: 'Alla esimerkkejä pääsarjoista. Rinnalla voi olla myös useampi samantyyppinen tai hieman kevennetty sarja.',
+        preText: 'Alla esimerkkejä II-alueen treeneistä:',
         items: [
           '✅ Uinti: pääsarja esim. 4 × 400 m (potkuja ja uintia vuorotellen reippaalla vauhdilla), 1–2 min palautus',
           '✅ Juoksu / pyöräily / melonta: vähintään 35–45 min yhtämittainen reipas lenkki tasaisella teholla',
