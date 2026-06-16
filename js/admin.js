@@ -1287,6 +1287,34 @@ const _ZONE_DATA = {
       },
     ],
   },
+  // Yhdistelmä I–II (peruskunto + kestävyys). String-avain käytetään ennen yksittäistä
+  // numeroa _viikkoohjeZoneHtml-resolverissa.
+  'I–II': {
+    name: 'Peruskunto / Kestävyys',
+    intro: 'Seuraavalla kahdella viikolla teemana on peruskunto ja kestävyys. Viikon ydin on rauhallinen, aerobinen pohjatyö. I-alueen harjoitukset tukevat palautumista ja rakentavat kestävyyspohjaa, josta kaikki kovempi harjoittelu ammentaa. II-alueen reippaammat treenit täydentävät viikkoa sopivan vireyden mukaan, mutta peruskunto on pääosassa.',
+    sections: [
+      {
+        title: 'Peruskuntotreeni (I-alue)',
+        subtitle: 'Syke 50–70 % maksimista',
+        preText: 'Rauhallista, pitkäkestoista tekemistä. Syke pysyy hallinnassa. Tukee palautumista ja rakentaa aerobista pohjaa.\n\nAlla esimerkkejä I-alueen treeneistä:',
+        items: [
+          '✅ Kevyt uinti',
+          '✅ Rauhallinen pyöräily',
+          '✅ Kävely tai kevyt hölkkä',
+          '✅ Liikkuvuus ja kehonhuolto',
+        ],
+      },
+      {
+        title: 'Kestävyystreeni (II-alue)',
+        subtitle: 'Syke 60–80 % maksimista',
+        preText: 'Yhtäjaksoista tai pidempinä vetoina tehtävää reipasta tekemistä. Syke nousee selvästi peruskuntoaluetta korkeammalle, mutta tekeminen pysyy hallittuna ja maitohapot eivät pysäytä tekemistä. Tämä kehittää kykyä tehdä pitkäkestoista suorituksia ja palautua kuormituksesta.\n\nAlla esimerkkejä II-alueen treeneistä:',
+        items: [
+          '✅ Uinti: pääsarja esim. 4 × 400 m (potkuja ja uintia vuorotellen reippaalla vauhdilla), 1–2 min palautus',
+          '✅ Juoksu / pyöräily / melonta: vähintään 35–45 min yhtämittainen reipas lenkki tasaisella teholla',
+        ],
+      },
+    ],
+  },
   5: {
     name: 'Nopeus',
     intro: 'Tällä viikolla teemana on <strong>nopeus</strong>, eli <strong>räjähtäviä alle 10 sekunnin maksimisuorituksia</strong> erittäin pitkillä palautuksilla. Tavoitteena on <strong>1–2 laadukasta harjoitusta</strong>. Lepoa enemmän kuin normaalisti – hermosto on etusijalla.',
@@ -1317,13 +1345,14 @@ const _ZONE_DATA = {
 function _viikkoohjeZoneHtml(zoneStr) {
   const zones = typeof parseZoneStr === 'function' ? parseZoneStr(zoneStr) : [];
   const primaryIdx = zones.length ? Math.max(...zones) : 0;
-  const data = _ZONE_DATA[primaryIdx];
+  const data = _ZONE_DATA[zoneStr] || _ZONE_DATA[primaryIdx];
   if (!data) return `<p>Ei sisältöä tehoalueelle ${escapeHtml(zoneStr)}.</p>`;
 
+  const _para = txt => txt.split('\n\n').map(p => `<p>${escapeHtml(p)}</p>`).join('');
   const sectionsHtml = data.sections.map(s => {
     const subtitleHtml = s.subtitle  ? `<p class="viikkoohje-subtitle">${escapeHtml(s.subtitle)}</p>` : '';
-    const preHtml      = s.preText   ? `<p>${escapeHtml(s.preText)}</p>`   : '';
-    const postHtml     = s.postText  ? `<p>${escapeHtml(s.postText)}</p>`  : '';
+    const preHtml      = s.preText   ? _para(s.preText)   : '';
+    const postHtml     = s.postText  ? _para(s.postText)  : '';
     const itemsHtml    = s.items.length
       ? `<ul>${s.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : '';
     return `<h4>${escapeHtml(s.title)}</h4>${subtitleHtml}${preHtml}${itemsHtml}${postHtml}`;

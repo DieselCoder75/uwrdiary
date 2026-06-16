@@ -244,7 +244,7 @@ window.addEventListener('online', () => {
   updateOfflineBanner(false);
   const count = getPendingCount();
   if (count > 0) {
-    toast(`✅ Yhteys palautettu — ${count} ${count === 1 ? 'treenikirjaus' : 'treenikirjausta'} synkattu`, 'success');
+    toast(`✅ Yhteys palautettu — jonossa olleet kirjaukset synkronoidaan`, 'success');
     setPendingCount(0);
   }
 });

@@ -11,7 +11,8 @@ const WEEKLY_PLAN = {
     15: 'IV',    16: 'I–II',  17: 'III',   18: 'IV',
     19: 'I–II',  20: 'IV',    21: 'V',     22: 'I–II',
     23: 'III',   24: 'IV',    25: 'I–II',  26: 'I–II',
-    27: 'III',   28: 'I–II',
+    27: 'III',   28: 'I–II',  29: 'I–II',  30: 'III',
+    31: 'I–II',  32: 'I–II',  33: 'IV',
   }
 };
 
