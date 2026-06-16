@@ -51,9 +51,11 @@ async function ensureAdminUsers(force = false) {
   );
   await Promise.all(cachedAdminUsers.map(async u => {
     try {
-      const es = await db.collection('users').doc(u.uid)
-        .collection('entries').where('date', '>=', cutoff).get();
-      u.recentCount = es.size;
+      // count()-aggregaatti: laskutetaan ~1 luku/1000 indeksimerkintää sen sijaan että
+      // haettaisiin jokainen dokumentti (~95 % vähemmän lukuja). Jos SDK ei tue → catch → -1.
+      const agg = await db.collection('users').doc(u.uid)
+        .collection('entries').where('date', '>=', cutoff).count().get();
+      u.recentCount = agg.data().count;
     } catch (err) { console.error('recentCount fetch for', u.uid, ':', err); u.recentCount = -1; }
   }));
 
@@ -757,7 +759,13 @@ function downloadCsv(rows, filename) {
   const PERF = ['', 'I – Peruskunto', 'II – Kestävyys', 'III – Maksimikestävyys', 'IV – Nopeuskestävyys', 'V – Nopeus'];
   const FEEL = ['', 'Erittäin väsynyt', 'Väsynyt', 'Normaali', 'Hyvä', 'Erinomainen'];
   const headers = ['Pelaaja','Päivämäärä','Aktiviteetti','Kesto (min)','Tehoalue','Fiilis','Matka (km)','Keskisyke (bpm)','Maksimisyke (bpm)','Kommentti'];
-  const esc = v => { if (v == null || v === '') return ''; const s = String(v); return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s; };
+  const esc = v => {
+    if (v == null || v === '') return '';
+    let s = String(v);
+    // Estä CSV-kaavainjektio: =+-@ -alkuiset solut suoritetaan kaavana Excelissä → prefiksoi heittomerkillä
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  };
   const lines = [headers.join(',')];
   rows.forEach(r => {
     lines.push([

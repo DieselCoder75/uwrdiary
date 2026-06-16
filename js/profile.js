@@ -311,7 +311,14 @@ el('avatar-file').addEventListener('change', async (e) => {
 
   const MAX_BYTES = 100 * 1024; // 100 KB
 
-  const compressed = await compressImage(file);
+  let compressed;
+  try {
+    compressed = await compressImage(file);
+  } catch (err) {
+    console.warn('compressImage failed:', err);
+    toast('Kuvaa ei voitu käsitellä. Kokeile toista kuvaa (esim. JPG tai PNG).', 'error');
+    return;
+  }
   const compressedBytes = Math.round((compressed.length * 3) / 4); // base64 → bytes estimate
 
   if (compressedBytes > MAX_BYTES) {
@@ -414,7 +421,7 @@ el('profile-share-activities').addEventListener('change', syncShareCommentsState
 
 // Image compression — crops to square centre, max 240px, targets < 100KB
 function compressImage(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -430,6 +437,12 @@ function compressImage(file) {
       const sq = Math.min(img.width, img.height);
       ctx.drawImage(img, sx, sy, sq, sq, 0, 0, size, size);
       resolve(canvas.toDataURL('image/jpeg', 0.70));
+    };
+    // Dekoodaamaton kuva (esim. HEIC selaimessa joka ei tue sitä) → reject,
+    // muuten await jäisi roikkumaan ikuisesti ja object-URL vuotaisi.
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('image decode failed'));
     };
     img.src = url;
   });
@@ -1628,7 +1641,13 @@ el('export-data-btn').addEventListener('click', async () => {
     const headers = ['Päivämäärä','Laji','Kesto (min)','Tehoalue','Fiilis','Matka (km)','Keskisyke','Maksimisyke','Kommentti'];
     const rows = snap.docs.map(doc => {
       const d = doc.data();
-      const escape = v => v != null ? `"${String(v).replace(/"/g, '""')}"` : '';
+      const escape = v => {
+        if (v == null) return '';
+        let s = String(v);
+        // Estä CSV-kaavainjektio: =+-@ -alkuiset solut suoritetaan kaavana Excelissä → prefiksoi heittomerkillä
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return `"${s.replace(/"/g, '""')}"`;
+      };
       return [
         fmtDate(d.date),
         escape(d.type || ''),
