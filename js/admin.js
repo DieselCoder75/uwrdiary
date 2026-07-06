@@ -96,6 +96,7 @@ function startImpersonation(uid, name, email) {
   // Reload entries for the viewed user
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
   allChartEntries = []; // pakota chart-datan uudelleenhaku impersonoidulle käyttäjälle
+  if (typeof resetAbsenceState === 'function') resetAbsenceState();
   loadEntries();
 }
 
@@ -119,6 +120,7 @@ function stopImpersonation() {
   // Lataa oma loki taustalla (ei blokkaa portaalin avautumista)
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
   allChartEntries = []; // pakota chart-datan paluu omaan käyttäjään
+  if (typeof resetAbsenceState === 'function') resetAbsenceState();
   loadEntries();
 }
 
@@ -1299,7 +1301,7 @@ const _ZONE_DATA = {
   // numeroa _viikkoohjeZoneHtml-resolverissa.
   'I–II': {
     name: 'Peruskunto / Kestävyys',
-    intro: 'Seuraavalla kahdella viikolla teemana on peruskunto ja kestävyys. Viikon ydin on rauhallinen, aerobinen pohjatyö. I-alueen harjoitukset tukevat palautumista ja rakentavat kestävyyspohjaa, josta kaikki kovempi harjoittelu ammentaa. II-alueen reippaammat treenit täydentävät viikkoa sopivan vireyden mukaan, mutta peruskunto on pääosassa.',
+    intro: 'Tällä viikolla teemana on peruskunto ja kestävyys. Viikon ydin on rauhallinen, aerobinen pohjatyö. I-alueen harjoitukset tukevat palautumista ja rakentavat kestävyyspohjaa, josta kaikki kovempi harjoittelu ammentaa. II-alueen reippaammat treenit täydentävät viikkoa sopivan vireyden mukaan, mutta peruskunto on pääosassa.',
     sections: [
       {
         title: 'Peruskuntotreeni (I-alue)',

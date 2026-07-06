@@ -59,6 +59,20 @@ service cloud.firestore {
         // Any authenticated user can read (needed for team comparison)
         allow read: if request.auth != null;
       }
+
+      // Poissaolot (sairas/loukkaantunut/…) — YKSITYISIÄ, eivät näy feedissä.
+      match /absences/{absId} {
+        // Omistaja: täysi luku/kirjoitus
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Admin: lukee kenen tahansa (impersonointi)
+        allow read: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+        // Valmentaja: lukee VAIN oman joukkueensa pelaajien poissaolot
+        allow read: if request.auth != null
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.coachOf is list
+          && get(/databases/$(database)/documents/users/$(userId)).data.profile.teams is list
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.coachOf
+               .hasAny(get(/databases/$(database)/documents/users/$(userId)).data.profile.teams);
+      }
     }
   }
 }

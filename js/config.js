@@ -72,6 +72,18 @@ const ALL_TYPES = [
 
 const JOUKKUE_PAGE_SIZE = 20;
 
+// Poissaolon ala-tyypit (value tallennetaan Firestoreen, label näytetään UI:ssa)
+const ABSENCE_TYPES = [
+  { value: 'sairas',        label: 'Sairaus',               emoji: '🤒' },
+  { value: 'loukkaantunut', label: 'Loukkaantuminen',       emoji: '🤕' },
+  { value: 'rasitusvamma',  label: 'Rasitusvamma',          emoji: '😣' },
+  { value: 'vasymys',       label: 'Uupumus / Ylikuormitus', emoji: '😴' },
+  { value: 'este',          label: 'Työeste / Matka',       emoji: '✈️' },
+  { value: 'muu',           label: 'Muu',                   emoji: '🤷' },
+];
+const ABSENCE_TYPE_LABEL = Object.fromEntries(ABSENCE_TYPES.map(t => [t.value, t.label]));
+const ABSENCE_TYPE_EMOJI = Object.fromEntries(ABSENCE_TYPES.map(t => [t.value, t.emoji]));
+
 // ============================================================
 // EWMA TRAINING LOAD — tehoaluepainot + lajikertoimet
 // ============================================================

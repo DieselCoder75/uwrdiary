@@ -11,7 +11,7 @@ const AICOACH_LS_PREFIX = 'uppis_aicoach_';          // + uid
 const AICOACH_TTL       = 7 * 24 * 60 * 60 * 1000;    // 1 vko
 // Nosta tätä aina kun promptia muutetaan → vanha välimuisti mitätöityy ja
 // analyysi ajetaan uusiksi uudella promptilla seuraavalla avauksella.
-const AICOACH_PROMPT_VERSION = 4;
+const AICOACH_PROMPT_VERSION = 11;
 const AICOACH_VOIMA_TYPES = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 
 const AICOACH_ZONE_DESC = [
@@ -66,7 +66,19 @@ function aiCoachBuildContext() {
       const fl   = e.feeling >= 1 ? e.feeling : '–';
       return `${e.type} ${e.duration}min(teho ${zone}, fiilis ${fl})`;
     }).join('; ') || 'ei treenejä';
-    return `Vk ${week}: yhteensä ${wk.length} treeniä (uppopallo ${uppo}, oheis ${oheis}, joista uinti ${uinti}, voima ${voima}); suunniteltu tehoalue ${planned}; fiilis ka ${avgFeel}/5; ACWR ${acwr}. Treenit: ${sessions}`;
+    // Poissaolot tällä viikolla
+    const absDays = (typeof allAbsenceDays !== 'undefined')
+      ? allAbsenceDays.filter(a => a.date >= wStart && a.date < wEnd) : [];
+    const absStr = absDays.length
+      ? `; poissa ${absDays.length} pv (${[...new Set(absDays.map(a => ABSENCE_TYPE_LABEL[a.type] || a.type))].join(', ')})`
+      : '';
+    // Kuluva (kesken oleva) viikko: merkitse montako päivää kulunut
+    const _today = new Date(); _today.setHours(0, 0, 0, 0);
+    const isCurrentWeek = _today >= wStart && _today < wEnd;
+    const elapsed = (_today.getDay() || 7); // ma=1 … su=7
+    const wd = ['maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai', 'sunnuntai'][elapsed - 1];
+    const keskenTag = isCurrentWeek ? ` [VIIKKO KESKEN — tänään ${wd}, vasta ${elapsed}/7 pv kulunut, viikolle kertyy todennäköisesti vielä treenejä]` : '';
+    return `Vk ${week}${keskenTag}: yhteensä ${wk.length} treeniä (uppopallo ${uppo}, oheis ${oheis}, joista uinti ${uinti}, voima ${voima}); suunniteltu tehoalue ${planned}; fiilis ka ${avgFeel}/5; ACWR ${acwr}${absStr}. Treenit: ${sessions}`;
   });
 
   // Ensi viikon suunniteltu tehoalue (suosituksia varten)
@@ -89,7 +101,62 @@ function aiCoachBuildContext() {
     }).length;
   }
 
-  return { lines, entryCount: entries.length, nextWeekZone, nextWeekNum, recentSessionCount };
+  // Nykytila: onko pelaaja juuri nyt poissaolojaksolla?
+  let absentToday = false, currentAbsenceType = null;
+  if (typeof allAbsenceDays !== 'undefined' && typeof absenceDateKey === 'function') {
+    const todayKey = absenceDateKey(new Date());
+    const todayAbs = allAbsenceDays.find(a => absenceDateKey(a.date) === todayKey);
+    if (todayAbs) { absentToday = true; currentAbsenceType = ABSENCE_TYPE_LABEL[todayAbs.type] || todayAbs.type; }
+  }
+
+  // (E) Montako viikkoa sisältää dataa → alle 2 vk = liian vähän arvioitavaksi
+  const weeksWithData = weeks.filter(wStart => {
+    const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 7);
+    return entries.some(e => { const d = e.date?.toDate ? e.date.toDate() : new Date(e.date); return d >= wStart && d < wEnd; });
+  }).length;
+
+  // (A) Tulevat maajoukkuetapahtumat (vain NT-pelaajalle; sarjapelit eivät ole kalenterissa)
+  const viewTeams = (impersonating ? impersonating.teams : userProfile?.teams) || [];
+  const isNT = viewTeams.includes('Naisten Maajoukkue');
+  let upcomingEvents = [];
+  if (isNT && typeof TEAM_EVENTS !== 'undefined') {
+    const todayStr = timestampToDateStr(new Date());
+    upcomingEvents = TEAM_EVENTS
+      .filter(ev => ev.end >= todayStr && !/pelikierro|sarjapeli|sarjapel/i.test(ev.label))
+      .sort((a, b) => (a.start < b.start ? -1 : 1))
+      .slice(0, 3)
+      .map(ev => `${ev.label} (${ev.dates})`);
+  }
+
+  // (B) Peräkkäiset kovat päivät (teho III/IV kahtena peräkkäisenä päivänä)
+  const hardKeys = new Set();
+  entries.forEach(e => {
+    if (e.performance === 3 || e.performance === 4) {
+      const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+      hardKeys.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+  });
+  const hardDates = [...hardKeys].sort();
+  const consecutiveHardPairs = [];
+  for (let i = 1; i < hardDates.length; i++) {
+    const prev = new Date(`${hardDates[i - 1]}T00:00:00`);
+    const cur  = new Date(`${hardDates[i]}T00:00:00`);
+    // Math.round koska kesäaikarajalla vrk on 23 h tai 25 h (≠ 86400000 ms)
+    if (Math.round((cur - prev) / 86400000) === 1) {
+      consecutiveHardPairs.push(`${prev.getDate()}.${prev.getMonth() + 1}.→${cur.getDate()}.${cur.getMonth() + 1}.`);
+    }
+  }
+
+  // (C) Pelaajan omat viikkotavoitteet
+  const vp = (impersonating ? impersonating.profile : userProfile) || {};
+  const minGoal  = vp.weeklyMinutesGoal  || null;
+  const sessGoal = vp.weeklySessionsGoal || null;
+
+  return {
+    lines, entryCount: entries.length, nextWeekZone, nextWeekNum, recentSessionCount,
+    absentToday, currentAbsenceType, weeksWithData, upcomingEvents, consecutiveHardPairs,
+    minGoal, sessGoal,
+  };
 }
 
 function aiCoachBuildPrompt() {
@@ -103,6 +170,9 @@ ${ctx.lines.join('\n')}
 VIIMEISEN 7 PÄIVÄN TREENIKIRJAUKSET (laskien viimeisimmästä kirjauksesta taaksepäin): ${ctx.recentSessionCount} treeniä
 
 ENSI VIIKON (vk ${ctx.nextWeekNum}) SUUNNITELTU TEHOALUE: ${ctx.nextWeekZone}
+${ctx.upcomingEvents.length ? `\nTULEVAT MAAJOUKKUETAPAHTUMAT (huomioi periodisoinnissa):\n${ctx.upcomingEvents.join('\n')}\n(Huom: sarjapelit/pelikierrokset eivät ole tässä kalenterissa, koska ne eivät ole virallista maajoukkuetoimintaa.)` : ''}${(ctx.minGoal || ctx.sessGoal) ? `\nPELAAJAN VIIKKOTAVOITTEET: ${[ctx.minGoal ? `${ctx.minGoal} min` : null, ctx.sessGoal ? `${ctx.sessGoal} treeniä` : null].filter(Boolean).join(' / ')}` : ''}\nPERÄKKÄISET KOVAT PÄIVÄT (kova päivä = päivä jolla ≥1 teho III/IV -treeni; listattu vain parit ilman palauttavaa I/II/V- tai vapaapäivää välissä): ${ctx.consecutiveHardPairs.length ? ctx.consecutiveHardPairs.join(', ') : 'ei havaittu'}
+
+DATAN MÄÄRÄ: kirjauksia on ${ctx.weeksWithData} viikolta.
 
 TEHOALUESELITTEET:
 ${zoneDesc}
@@ -114,12 +184,28 @@ TÄRKEÄÄ DATAN TULKINNASSA:
 - Jos aivan viimeisiltä päiviltä puuttuu treenejä, kyse on todennäköisesti siitä, ettei uusimpia treenejä ole vielä ehditty kirjata. Älä tulkitse tätä harjoittelun vähenemiseksi.
 - Keskity siihen jaksoon, jolta dataa selvästi on.
 
+POISSAOLOT:
+- Pelaaja voi merkitä poissaolopäiviä syineen. Ne näkyvät viikkoriveillä muodossa "poissa N pv (syy)".
+- ÄLÄ moiti vähäisestä treenimäärästä viikoilla joilla on poissaoloja — vähäisyys selittyy niillä. Suhtaudu ymmärtäväisesti ja ammattimaisesti.
+- Anna syyn mukaista valmennusohjausta:
+  • Sairaus: sairaana EI tule treenata. Suosittele lepoa ja täyttä palautumista ennen paluuta harjoitteluun.
+  • Loukkaantuminen / Rasitusvamma: harjoittelua voi yleensä jatkaa, mutta VÄLTÄ loukkaantuneen tai rasittuneen kehonosan kuormittamista. Ehdota vaihtoehtoisia harjoitteita, jotka eivät rasita kyseistä aluetta (esim. tekniikka, ylävartalo jos jalka kipeä, vesijuoksu jne.).
+  • Uupumus / Ylikuormitus: suosittele treenikuorman keventämistä ja palautumisen priorisointia, kunnes vireys ja jaksaminen palaavat.
+- Pitkän sairaus- tai loukkaantumisjakson jälkeen nosta kuormaa MALTILLISESTI (ACWR voi piikata paluussa → loukkaantumisriski).${ctx.absentToday ? `\n- NYKYTILA: Pelaaja on juuri nyt merkitty poissaolevaksi (${ctx.currentAbsenceType}). Anna juuri tähän syyhyn sopiva ohje (yllä) ja priorisoi palautuminen — älä tyrkytä kovia treenejä.` : ''}
+
 OHJEET ANALYYSIIN:
-- Anna erityinen painoarvo viimeisimmälle 1–2 viikolle. Käytä vanhempaa dataa trendien vahvistamiseen ja pitkän aikavälin kokonaisuuden hahmottamiseen, mutta konkreettiset havainnot ja suositukset pohjaa ensisijaisesti tuoreimpaan dataan.
-- Arvioi viikoittainen harjoitusmäärä ja uppopallo/oheis-suhde suhteessa yllä olevaan suuntaa-antavaan jaotteluun.
+- DATAN RIITTÄVYYS: ${ctx.weeksWithData < 2 ? 'Dataa on alle kahdelta viikolta — ÄLÄ arvioi treenimääriä, tehoaluejakaumaa tai trendejä. Kerro ystävällisesti ja kannustavasti, että dataa on toistaiseksi liian vähän luotettavaan analyysiin, ja rohkaise jatkamaan kirjaamista. Voit silti antaa yleisluontoisia, motivoivia vinkkejä.' : 'Dataa on vähintään kahdelta viikolta → perusarvio on perusteltu.'}
+- Älä keksi tietoja joita datassa ei ole; perusta kaikki havainnot vain annettuun dataan.
+- KANNUSTA: nosta aina esiin myös onnistumiset ja edistyminen (esim. hyvä treeniputki, noussut uinti-/voimamäärä, osuneet tehoalueet, hyvä fiilis, kuorma optimivyöhykkeellä). Aloita Kokonaiskuva positiivisella ja vahvista sitä mikä menee hyvin — rehellisyys ja kehityskohdat mukana, mutta kannustavalla otteella.
+- Anna erityinen painoarvo viimeisimmälle 1–2 viikolle. Käytä vanhempaa dataa trendien vahvistamiseen ja pitkän aikavälin kokonaisuuden hahmottamiseen, mutta pohjaa konkreettiset havainnot ja suositukset ensisijaisesti tuoreimpaan dataan.
+- KESKEN OLEVA VIIKKO: viimeinen viikko on usein kesken (ks. "[VIIKKO KESKEN …]" -merkintä rivillä). ÄLÄ arvioi sen treenimäärää tai jakaumaa valmiina äläkä tulkitse sitä kevyeksi — viikolle kertyy vielä treenejä. Arvioi viikkomäärät ja -jakauma ensisijaisesti PÄÄTTYNEISTÄ viikoista. Kesken olevasta viikosta voit kommentoida vain jo toteutunutta (esim. peräkkäiset kovat päivät) ja antaa eteenpäin katsovia vinkkejä loppuviikolle.
+- Arvioi viikoittainen harjoitusmäärä ja uppopallo/oheis-suhde suhteessa yllä olevaan suuntaa-antavaan jaotteluun (päättyneiltä viikoilta).
 - Huomioi sisältyykö viikoittaiseen oheisharjoitteluun sekä uintia että voimaharjoittelua. Kannusta pitämään molemmat mukana.
 - Katso osuvatko kovat tehoaluetreenit kalenterin suunniteltuun tehoalueeseen.
-- Tarkista fiilis- ja kuorma (ACWR) -trendit. Jos fiilis on laskussa tai kuorma epäsuotuisalla tasolla (ACWR selvästi yli 1,3 tai jatkuvasti hyvin matala), nosta se esiin lempeästi ja anna konkreettinen vinkki palautumiseen.${ctx.recentSessionCount < 3 ? `\n- HUOMIO: Viimeisen 7 päivän kirjauksissa on vain ${ctx.recentSessionCount} treeni${ctx.recentSessionCount === 1 ? '' : 'ä'}. Kannusta motivoivasti ja lempeästi nostamaan viikoittaista treenimäärää – muistuta, että säännöllisyys on kehittymisen perusta.` : ''}
+- Tehoaluejakauma: JOKAISELLA viikolla vähintään noin 60 % kuormasta olisi hyvä olla kevyttä tai tasapainottavaa (tehoalueet I, II tai V — V on neuraalista, ei maitohapollista) tasapainottamassa kovia treenejä. KOVAN teeman viikoilla maitohapollisen kovan työn (tehoalueet III–IV) osuuden tulisi olla vähintään noin 20 %. Puutu jakaumaan vain jos se selvästi poikkeaa näistä.
+- Peräkkäiset kovat päivät: kova treenipäivä = päivä jolla on yksi tai useampi teho III tai IV -treeni. Jos kahden kovan päivän VÄLISSÄ on palauttava päivä (vain tehoalueiden I, II tai V treenejä) TAI vapaapäivä, palautuminen on kunnossa — ÄLÄ nosta sitä esiin. Nosta huomioissa esiin VAIN aidosti peräkkäiset kovat kalenteripäivät (ei palauttavaa/vapaapäivää välissä) ja suosittele tällöin palauttavan päivän lisäämistä väliin (maitohapolliset treenit vaativat palautumista). Käytä TÄSMÄLLEEN yllä olevaa "PERÄKKÄISET KOVAT PÄIVÄT" -listaa: jos siinä lukee "ei havaittu", peräkkäisiä kovia päiviä EI ole — älä väitä muuta. ÄLÄ päättele peräkkäisyyttä itse viikkodatan treenilistasta, koska siinä ei ole päivätason järjestystä.
+- Tarkista fiilis- ja kuorma (ACWR) -trendit. Jos huono fiilis ja noussut kuorma näyttävät seuraavan toisiaan, suosittele kuorman keventämistä palauttavilla treeneillä. Nosta myös lempeästi esiin, jos ACWR on selvästi yli 1,3 tai jatkuvasti hyvin matala.
+- Voit verrata toteutuneita treenejä pelaajan omiin viikkotavoitteisiin (yllä, jos asetettu).${ctx.upcomingEvents.length ? '\n- Huomioi tulevat maajoukkuetapahtumat (yllä): ehdota kevennystä (taper) juuri ennen leiriä/kisaa ja kovempaa työtä hyvissä ajoin sitä ennen.' : ''}${ctx.recentSessionCount < 3 && !ctx.absentToday && ctx.weeksWithData >= 2 ? `\n- HUOMIO: Viimeisen 7 päivän kirjauksissa on vain ${ctx.recentSessionCount} treeni${ctx.recentSessionCount === 1 ? '' : 'ä'}. Kannusta motivoivasti ja lempeästi nostamaan viikoittaista treenimäärää – muistuta, että säännöllisyys on kehittymisen perusta.` : ''}
 - Suosituksissa huomioi ensi viikon suunniteltu tehoalue (yllä): ehdota mille tehoalueelle kovat vedot kannattaa ajoittaa.
 - Älä tee terveys- tai lääketieteellisiä väittämiä; puhu harjoittelusta.
 
@@ -222,6 +308,7 @@ async function aiCoachRun() {
   // Capture uid before any await — impersonation may change during async Gemini call
   const capturedUid = (typeof viewUid === 'function' ? viewUid() : currentUser?.uid) || 'anon';
   if (!allChartEntries.length) await fetchChartEntries();
+  if (typeof loadAbsences === 'function') await loadAbsences(); // poissaolot promptiin
   if (!allChartEntries.length) {
     if (out) out.innerHTML = '<p class="aicoach-empty">Ei treenidataa analysoitavaksi.</p>';
     return;

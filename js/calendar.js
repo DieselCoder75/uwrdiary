@@ -32,6 +32,8 @@ let calLoadedForUid = null; // uid jolle kalenteri on ladattu; null = ei ladattu
 
 // "YYYY-MM-DD" → [{type, duration, performance}] (kaikki päivän treenit)
 let calEntriesMap = {};
+// "YYYY-MM-DD" → { type, comment, periodId } (poissaolot, mustalla reunuksella)
+let calAbsenceMap = {};
 
 // ─── Maajoukkueen tapahtumat ──────────────────────────────────
 const TEAM_EVENTS = [
@@ -42,8 +44,9 @@ const TEAM_EVENTS = [
   { start: '2026-05-16', end: '2026-05-16', label: 'Varainkeruu – Helsinki', dates: '16.5.2026', note: 'Helsinki City Run' },
   { start: '2026-06-13', end: '2026-06-14', label: 'Leiri – Leppävaara',  dates: '13.–14.6.2026', link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-leppa-2/' },
   { start: '2026-08-15', end: '2026-08-16', label: 'Leiri – Kumpula',    dates: '15.–16.8.2026', link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-kumpu/' },
-  { start: '2026-09-05', end: '2026-09-06', label: 'Leiri – Seinäjoki',  dates: '5.–6.9.2026'    },
+  { start: '2026-09-05', end: '2026-09-06', label: 'Leiri – Seinäjoki',  dates: '5.–6.9.2026',   link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-ja-mm/' },
   { start: '2026-10-03', end: '2026-10-04', label: 'Leiri – Kokkola',     dates: '3.–4.10.2026'   },
+  { start: '2026-10-24', end: '2026-10-25', label: 'Varainkeruu/Leiri – Kouvola', dates: '24.–25.10.2026' },
   { start: '2027-01-23', end: '2027-01-24', label: 'SWE-FIN Camp III – Turku', dates: '23.–24.1.2027' },
   { start: '2027-05-15', end: '2027-05-22', label: 'MM-Kisat – Torremolinos', dates: '15.–22.5.2027', highlight: true },
   { start: '2025-11-09', end: '2025-11-15', label: 'EM-Kisat – Ateena 🥉', dates: '9.–15.11.2025', link: 'https://www.uppopallo.fi/uutiset/suomen-naiset-voitti-em-pronssia/' },
@@ -187,10 +190,13 @@ async function renderCalendarTab() {
   container.innerHTML = '<div class="cal-loading">Ladataan…</div>';
   initCalTooltip();
 
+  calAbsenceMap = {};
   await Promise.all([
     loadCalendarMonth(now.getFullYear(), now.getMonth()),
     loadCalendarMonth(calOldestYear, calOldestMonth),
+    (typeof loadAbsences === 'function') ? loadAbsences() : Promise.resolve(),
   ]);
+  if (typeof buildAbsenceDayMap === 'function') calAbsenceMap = buildAbsenceDayMap();
 
   const today   = now;
   const viewTeams = impersonating ? (impersonating.teams || []) : (userProfile.teams || []);
@@ -358,10 +364,11 @@ function buildMonthHTML(year, month, today, showPlan = false) {
         const maxPerf = entries ? Math.max(...entries.map(e => e.performance)) : null;
         const bgColor = maxPerf ? PERF_COLORS[maxPerf - 1] : null;
         const evInfo  = mjEventsMap[calDateKey(cellDate)] || null;
+        const absInfo = calAbsenceMap[calDateKey(cellDate)] || null;
 
         // Tooltip-data päivästä
         const tipData = [];
-        if (entries?.length || evInfo) {
+        if (entries?.length || evInfo || absInfo) {
           const dateLabel = cellDate.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric', year: 'numeric' });
           tipData.push({ _date: true, label: dateLabel });
         }
@@ -369,6 +376,10 @@ function buildMonthHTML(year, month, today, showPlan = false) {
           entries.forEach(e => tipData.push({ type: e.type, duration: e.duration, perf: e.performance }));
         }
         if (evInfo) tipData.push({ _event: true, label: evInfo.ev.label, dates: evInfo.ev.dates });
+        if (absInfo) {
+          const _aLbl = (typeof ABSENCE_TYPE_LABEL !== 'undefined' && ABSENCE_TYPE_LABEL[absInfo.type]) || absInfo.type;
+          tipData.push({ _absence: true, label: _aLbl, comment: absInfo.comment || '' });
+        }
         tipAttr = tipData.length
           ? ` data-cal-tip='${JSON.stringify(tipData).replace(/'/g, '&#39;')}'` : '';
 
@@ -380,6 +391,7 @@ function buildMonthHTML(year, month, today, showPlan = false) {
           cls += ' cal-today';
         }
         if (evInfo) cls += ' cal-mj-event';
+        if (absInfo) cls += ' cal-absence';
 
         inner = `
           <span class="cal-day-num${isSun && !bgColor ? ' cal-sun' : ''}">${cellDate.getDate()}</span>
@@ -425,6 +437,9 @@ function showCalTooltip(cell) {
       html += `<div class="cal-tip-date">${item.label}</div>`;
     } else if (item._event) {
       html += `<div class="cal-tip-event">${item.label}<br><span class="cal-tip-dates">${item.dates}</span></div>`;
+    } else if (item._absence) {
+      const c = item.comment ? `<br><span class="cal-tip-dates">${escapeHtml(item.comment)}</span>` : '';
+      html += `<div class="cal-tip-absence">🚫 Poissaolo: ${escapeHtml(item.label)}${c}</div>`;
     } else {
       const parts = [];
       if (item.type)     parts.push(escapeHtml(item.type));

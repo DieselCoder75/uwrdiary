@@ -472,6 +472,7 @@ function renderWeekSummaryCard() {
     ${perfTotal > 0 ? `
     <div class="wsc-bar-wrap">${barHtml}</div>
     <div class="wsc-labels">${labelHtml}</div>` : ''}
+    ${(typeof absenceFooterHtml === 'function') ? absenceFooterHtml(mondayMs) : ''}
   `;
   card.classList.remove('hidden');
 }
@@ -524,6 +525,8 @@ function pastWeekSummaryHtml(docs, monday) {
     ${_pSg ? _ringHtml(count,    _pSg, 'krt', true) : ''}
   </div>` : '';
 
+  const _pAbsence = (typeof absenceFooterHtml === 'function') ? absenceFooterHtml(monday.getTime()) : '';
+
   return `<div class="week-summary-card week-summary-card--past">
     <div class="wsc-grid">
       <span class="wsc-week">VK ${week}${yearSuffix}</span>
@@ -535,6 +538,7 @@ function pastWeekSummaryHtml(docs, monday) {
       ${_pGoalsHtml || '<span></span>'}
     </div>
     ${perfTotal > 0 ? `<div class="wsc-bar-wrap">${barHtml}</div><div class="wsc-labels">${labelHtml}</div>` : ''}
+    ${_pAbsence}
   </div>`;
 }
 
@@ -542,21 +546,33 @@ function renderPage(liveDocs, extraDocs) {
   const list  = el('entries-list');
   const empty = el('empty-state');
   const allDocs = sortEntries([...liveDocs, ...extraDocs]);
+  _lastLokiRender = { live: liveDocs, extra: extraDocs }; // mahdollistaa footereiden uudelleenrenderöinnin
 
   renderWeekSummaryCard();
 
-  if (allDocs.length === 0) {
+  // Poissaoloviikot näkyvältä jaksolta (myös viikot ilman treenejä saavat tiilen)
+  const thisWeekMs   = weeksAgoMonday(0).getTime();
+  const lowerMs      = pageWindowStart.getTime();
+  const absWeeks     = (typeof absenceWeekMondays === 'function')
+    ? absenceWeekMondays(lowerMs, thisWeekMs) : new Set();
+  // Rajaa kuluvan viikon loppuun: tulevaisuuteen ulottuvat poissaolopäivät eivät
+  // saa estää empty-statea (ne näkyvät vain kalenterissa, eivät lokin tiilissä).
+  const endOfWeekMs = thisWeekMs + 7 * 24 * 60 * 60 * 1000;
+  const hasAbsInWindow = (typeof allAbsenceDays !== 'undefined')
+    && allAbsenceDays.some(a => { const t = a.date.getTime(); return t >= lowerMs && t < endOfWeekMs; });
+
+  if (allDocs.length === 0 && !hasAbsInWindow) {
     list.innerHTML = '';
     empty.classList.remove('hidden');
     hide('load-more-wrap');
     el('period-label').textContent = '';
+    ensureAbsencesForLoki();
     return;
   }
 
   empty.classList.add('hidden');
 
   // Group entries by week, insert past-week summary cards at week boundaries
-  const thisWeekMs = weeksAgoMonday(0).getTime();
   const weekGroups = new Map(); // weekMondayMs -> { monday, docs[] }
   allDocs.forEach(doc => {
     const ts  = doc.data().date;
@@ -565,6 +581,12 @@ function renderPage(liveDocs, extraDocs) {
     const key = mon.getTime();
     if (!weekGroups.has(key)) weekGroups.set(key, { monday: mon, docs: [] });
     weekGroups.get(key).docs.push(doc);
+  });
+  // Lisää tyhjät viikkoryhmät poissaoloviikoille (menneet viikot ilman treenejä)
+  absWeeks.forEach(weekMs => {
+    if (weekMs < thisWeekMs && !weekGroups.has(weekMs)) {
+      weekGroups.set(weekMs, { monday: new Date(weekMs), docs: [] });
+    }
   });
   const sortedWeeks = [...weekGroups.entries()].sort((a, b) => b[0] - a[0]);
 
@@ -577,12 +599,17 @@ function renderPage(liveDocs, extraDocs) {
   });
   list.innerHTML = html;
   showOwnEntryReactions(allDocs); // reads from cached reactionCounts — zero Firestore reads
+  ensureAbsencesForLoki();
 
-  // Period label
-  const newest = allDocs[0].data().date;
-  const oldest = allDocs[allDocs.length - 1].data().date;
-  const fmt    = ts => { const d = ts?.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric', year: 'numeric' }); };
-  el('period-label').textContent = `Näytetään: ${fmt(oldest)} – ${fmt(newest)}`;
+  // Period label (vain jos treenejä on; pelkkä poissaoloviikko ei aseta labelia)
+  if (allDocs.length) {
+    const newest = allDocs[0].data().date;
+    const oldest = allDocs[allDocs.length - 1].data().date;
+    const fmt    = ts => { const d = ts?.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric', year: 'numeric' }); };
+    el('period-label').textContent = `Näytetään: ${fmt(oldest)} – ${fmt(newest)}`;
+  } else {
+    el('period-label').textContent = '';
+  }
 
   // Load-more button
   if (hasMorePages) {
@@ -592,6 +619,18 @@ function renderPage(liveDocs, extraDocs) {
     hide('load-more-wrap');
     show('no-more-entries');
   }
+}
+
+// Lokin poissaolojen lataus + footereiden uudelleenrenderöinti (kun data saapuu)
+let _lastLokiRender = null;
+function rerenderLoki() {
+  if (_lastLokiRender) renderPage(_lastLokiRender.live, _lastLokiRender.extra);
+}
+function ensureAbsencesForLoki() {
+  if (typeof loadAbsences !== 'function') return;
+  const uid = impersonating ? impersonating.uid : currentUser?.uid;
+  if (absencesLoadedForUid === uid) return; // jo ladattu → ei silmukkaa
+  loadAbsences().then(rerenderLoki);
 }
 
 // ============================================================
@@ -665,6 +704,13 @@ function openModal(entryId = null, data = null) {
   // Stars
   setPerformance(data?.performance || 0);
   setFeeling(data?.feeling || 0);
+
+  // Välilehdet: tab-nav näkyy vain uudelle kirjaukselle; pakota Treeni-näkymä
+  el('entry-tab-nav')?.classList.toggle('hidden', !!entryId);
+  el('entry-form').classList.remove('hidden');
+  el('absence-form')?.classList.add('hidden');
+  document.querySelectorAll('.entry-tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.entryTab === 'treeni'));
 
   el('entry-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';

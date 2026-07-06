@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=424">
+  <link rel="stylesheet" href="styles.css?v=430">
 </head>
 <body>
 
@@ -457,6 +457,10 @@
         <h2 id="modal-title">Uusi Treeni</h2>
         <button id="close-modal" aria-label="Sulje">✕</button>
       </div>
+      <div class="entry-tab-nav" id="entry-tab-nav">
+        <button type="button" class="entry-tab-btn active" data-entry-tab="treeni">Treeni</button>
+        <button type="button" class="entry-tab-btn" data-entry-tab="poissaolo">Poissaolo</button>
+      </div>
       <form id="entry-form" novalidate>
 
         <div class="form-group">
@@ -534,6 +538,41 @@
           <button type="submit" id="entry-save-btn" class="btn-primary">Tallenna</button>
         </div>
 
+      </form>
+
+      <!-- Poissaolo-lomake (sairas/loukkaantunut/…) -->
+      <form id="absence-form" class="hidden" novalidate>
+        <p class="absence-privacy-note">🔒 Poissaolot ovat yksityisiä — ne näkyvät vain sinulle (ja valmentajallesi), eivät joukkueen feedissä.</p>
+        <div class="form-group">
+          <label>Ajanjakso</label>
+          <div class="absence-date-row">
+            <div class="absence-date-field">
+              <span class="label-optional">Alkaa</span>
+              <input type="date" id="absence-start" required>
+            </div>
+            <div class="absence-date-field">
+              <span class="label-optional">Päättyy</span>
+              <input type="date" id="absence-end" required>
+            </div>
+          </div>
+          <p class="absence-date-hint">Yhden päivän poissaololle valitse sama päivä alkuun ja loppuun.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Syy</label>
+          <div class="absence-type-btns" id="absence-type-btns"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Kommentti <span class="label-optional">(valinnainen, yksityinen)</span></label>
+          <textarea id="absence-comment" rows="3" placeholder="Esim. flunssa, nilkka kipeä…" maxlength="500"></textarea>
+          <p class="char-counter"><span id="absence-char-count">0</span>/500</p>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="absence-delete-btn" class="btn-danger hidden">Poista</button>
+          <button type="submit" id="absence-save-btn" class="btn-primary">Tallenna</button>
+        </div>
       </form>
     </div>
   </div>
@@ -904,7 +943,7 @@
       <!-- Välilehti: Käyttöohje -->
       <div id="help-tab-kaytto" class="help-body">
       <div class="help-version-bar">
-        <span class="help-version" id="help-version-text">Versio 1.7</span>
+        <span class="help-version" id="help-version-text">Versio 1.8</span>
         <span class="help-updated" id="help-updated-text">Päivitetty…</span>
       </div>
 
@@ -975,6 +1014,19 @@
             <li>Jokaisen päättyneen viikon yläpuolella näkyy <strong>viikkoyhteenveto</strong> — treenikerrat, kokonaisminuutit ja tehoaluejakauma</li>
             <li>Kuluvalle viikolle näytetään lisäksi tavoiterenkaat (jos tavoitteet on asetettu)</li>
             <li>Vanhempia treenejä lataat painamalla <strong>Lataa 2 viikkoa lisää</strong> -nappia listan lopussa</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>🚫 Poissaolot</h3>
+          <p>Voit kirjata sairaus-, loukkaantumis- ja muut poissaolopäivät samasta <strong>(+)</strong>-napista — valitse modaalin yläreunasta <strong>Poissaolo</strong>-välilehti (Treeni on oletuksena).</p>
+          <ul>
+            <li>Valitse <strong>ajanjakso</strong> (yhden päivän poissaololle sama päivä alkuun ja loppuun), enintään 2 viikkoa</li>
+            <li>Valitse <strong>syy</strong>: sairaus, loukkaantuminen, rasitusvamma, uupumus/ylikuormitus, työeste/matka tai muu</li>
+            <li>Voit lisätä vapaaehtoisen kommentin</li>
+            <li><strong>Poissaolot ovat yksityisiä</strong> — ne näkyvät vain sinulle (ja valmentajallesi), eivätkä koskaan joukkueen feedissä</li>
+            <li>Poissaolot näkyvät <strong>viikkoyhteenvedon alaosassa</strong> (klikkaamalla voit muokata tai poistaa) ja <strong>kalenterissa mustalla reunuksella</strong></li>
+            <li>Poissaolo ei estä treenien kirjaamista samalle päivälle, eikä se vaikuta harjoituskuormaan tai ennätyksiin</li>
           </ul>
         </section>
 
@@ -1107,6 +1159,17 @@
       <div id="help-tab-versiot" class="help-body hidden">
         <section class="help-section help-history">
           <h3>📝 Versiohistoria</h3>
+
+          <div class="history-entry">
+            <span class="history-version">v1.8</span>
+            <span class="history-date">23.6.2026</span>
+            <ul>
+              <li><strong>Poissaolot</strong> — kirjaa sairaus-, loukkaantumis- ja muut poissaolopäivät (+)-napin <em>Poissaolo</em>-välilehdeltä. Aikaväli enintään 2 viikkoa, oma syy ja vapaaehtoinen kommentti.</li>
+              <li>Poissaolot ovat <strong>yksityisiä</strong> — näkyvät vain itselle ja valmentajalle, eivät joukkueen feedissä</li>
+              <li>Näkyvät viikkoyhteenvedon alaosassa (muokattavissa) ja kalenterissa mustalla reunuksella</li>
+              <li>AI Coach huomioi poissaolot: ei moiti sairasviikoista ja kehottaa lepäämään sairaana</li>
+            </ul>
+          </div>
 
           <div class="history-entry">
             <span class="history-version">v1.7</span>
@@ -1369,19 +1432,20 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="js/config.js?v=15"></script>
+  <script src="js/config.js?v=19"></script>
   <script src="js/state.js?v=4"></script>
   <script src="js/cache.js?v=2"></script>
   <script src="js/utils.js?v=6"></script>
   <script src="js/records.js?v=2"></script>
-  <script src="js/entries.js?v=43"></script>
+  <script src="js/entries.js?v=45"></script>
+  <script src="js/absences.js?v=4"></script>
   <script src="js/charts.js?v=32"></script>
-  <script src="js/profile.js?v=69"></script>
+  <script src="js/profile.js?v=70"></script>
   <script src="js/joukkue.js?v=15"></script>
-  <script src="js/calendar.js?v=40"></script>
-  <script src="js/admin.js?v=52"></script>
-  <script src="js/aicoach.js?v=10"></script>
-  <script src="js/auth.js?v=22"></script>
+  <script src="js/calendar.js?v=43"></script>
+  <script src="js/admin.js?v=54"></script>
+  <script src="js/aicoach.js?v=18"></script>
+  <script src="js/auth.js?v=23"></script>
   <script src="js/app.js?v=20"></script>
 
   <!-- AI Coach: Firebase AI Logic (Gemini Developer API) — modulaarinen SDK -->
