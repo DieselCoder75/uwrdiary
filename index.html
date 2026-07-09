@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=430">
+  <link rel="stylesheet" href="styles.css?v=431">
 </head>
 <body>
 
@@ -340,13 +340,14 @@
       <!-- Tab: Aktiivisuus -->
       <div id="admin-tab-aktiivisuus" class="tab-content">
         <div class="admin-section">
-          <div class="admin-csv-row" style="margin-bottom:0.5rem">
-            <select id="admin-report-team" class="admin-select" style="flex:1">
-              <option value="">Valitse joukkue…</option>
-            </select>
-            <button id="admin-report-btn" class="btn-primary" style="flex:0 0 64px;padding-left:0;padding-right:0">Lataa</button>
+          <div id="admin-activity-hero" class="act-hero-card"></div>
+
+          <div id="admin-activity-report">
+            <p class="loading">Haetaan harjoitustietoja…</p>
           </div>
-          <div class="act-report-legend" style="margin-bottom:1rem">
+
+          <button id="act-legend-toggle" class="act-legend-toggle-btn" type="button">Selite ?</button>
+          <div class="act-report-legend hidden" id="act-legend-body">
             <div class="act-legend-row">
               <span><span class="act-legend-swatch act-week-0"></span> 0 treeniä</span>
               <span><span class="act-legend-swatch act-week-1"></span> 1 treeni</span>
@@ -358,9 +359,6 @@
               <span><span class="act-status act-status--moderate"></span> Kohtalainen</span>
               <span><span class="act-status act-status--inactive"></span> Ei aktiivinen</span>
             </div>
-          </div>
-          <div id="admin-activity-report">
-            <p class="loading">Valitse joukkue ja paina Lataa.</p>
           </div>
         </div>
       </div>
@@ -1443,7 +1441,7 @@
   <script src="js/profile.js?v=70"></script>
   <script src="js/joukkue.js?v=15"></script>
   <script src="js/calendar.js?v=43"></script>
-  <script src="js/admin.js?v=54"></script>
+  <script src="js/admin.js?v=55"></script>
   <script src="js/aicoach.js?v=18"></script>
   <script src="js/auth.js?v=23"></script>
   <script src="js/app.js?v=20"></script>

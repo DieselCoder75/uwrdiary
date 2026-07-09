@@ -174,15 +174,10 @@ async function openAdminPortal() {
 
   if (isAdmin) {
     loadAdminUserListPortal();
-    const reportSel = el('admin-report-team');
-    if (reportSel) { reportSel.value = '__all__'; renderActivityReport('__all__'); }
+    renderActivityReport('__all__'); // Aktiivisuus latautuu automaattisesti (ei joukkuevalintaa)
   } else if (isCoach) {
     // Auto-load first coach team in activity report
-    const reportSel = el('admin-report-team');
-    if (reportSel && coachTeams[0]) {
-      reportSel.value = coachTeams[0];
-      renderActivityReport(coachTeams[0]);
-    }
+    if (coachTeams[0]) renderActivityReport(coachTeams[0]);
     // Populate CSV player list for first team
     const csvSel = el('admin-csv-team-portal');
     if (csvSel && coachTeams[0]) {
@@ -454,19 +449,10 @@ async function saveTeamsToFirestore() {
 }
 
 // ── Activity report ───────────────────────────────────────────
-el('admin-report-btn').addEventListener('click', async () => {
-  const team = el('admin-report-team').value;
-  if (!team) { toast('Valitse ensin joukkue.', 'error'); return; }
-  // __all__ = näytä kaikki käyttäjät
-  const btn = el('admin-report-btn');
-  btn.disabled = true;
-  btn.textContent = 'Ladataan…';
-  try {
-    await renderActivityReport(team, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Lataa';
-  }
+// Aktiivisuus latautuu automaattisesti (openAdminPortal) — ei joukkuevalintaa/Lataa-nappia.
+// Selite piiloon oletuksena, avautuu napista.
+el('act-legend-toggle')?.addEventListener('click', () => {
+  el('act-legend-body')?.classList.toggle('hidden');
 });
 
 const ACT_REPORT_TTL = 60 * 60 * 1000; // 1 h
@@ -561,6 +547,9 @@ function renderActivityReportHtml(container, memberData, weeks) {
   // Sort: most active first
   memberData.sort((a, b) => b.total4 - a.total4 || b.total12 - a.total12);
 
+  // Yhteenveto-hero ylös
+  renderActivityHero(memberData);
+
   // Week label headers (dd.mm)
   const wHeaders = weeks.map(w =>
     w.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' })
@@ -574,9 +563,9 @@ function renderActivityReportHtml(container, memberData, weeks) {
   };
 
   const statusClass = total4 => {
-    if (total4 >= 2) return 'act-status--active';
-    if (total4 >= 1) return 'act-status--moderate';
-    return 'act-status--inactive';
+    if (total4 >= 2) return 'act-card--active';
+    if (total4 >= 1) return 'act-card--moderate';
+    return 'act-card--inactive';
   };
 
   const rows = memberData.map(m => {
@@ -584,25 +573,57 @@ function renderActivityReportHtml(container, memberData, weeks) {
       `<div class="act-week-cell ${weekColor(n)}" title="${wHeaders[i]}: ${n} treeniä"></div>`
     ).join('');
     const lastStr = m.lastDate
-      ? m.lastDate.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' })
-      : '—';
+      ? `viimeksi ${m.lastDate.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' })}`
+      : 'ei treenejä';
     return `
-      <div class="act-card">
+      <div class="act-card ${statusClass(m.total4)}">
         <div class="act-card-row1">
-          <span class="act-status ${statusClass(m.total4)}"></span>
           <span class="act-player-name">${escapeHtml(m.name)}</span>
           <span class="act-last">${lastStr}</span>
-          <span class="act-count-label">4vk <strong>${m.total4}</strong></span>
-          <span class="act-count-label">8vk <strong>${m.total8}</strong></span>
-          <span class="act-count-label">12vk <strong>${m.total12}</strong></span>
         </div>
-        <div class="act-card-row2">
-          <div class="act-weeks">${squares}</div>
+        <div class="act-weeks">${squares}</div>
+        <div class="act-pills">
+          <span class="act-pill">4 vk · <strong>${m.total4}</strong></span>
+          <span class="act-pill">8 vk · <strong>${m.total8}</strong></span>
+          <span class="act-pill">12 vk · <strong>${m.total12}</strong></span>
         </div>
       </div>`;
   }).join('');
 
   container.innerHTML = `<div class="act-card-list">${rows}</div>`;
+}
+
+// Yhteenveto-hero: aktiiviset/kohtalaiset/ei-aktiiviset + keskiarvo + kolmiosainen palkki
+function renderActivityHero(memberData) {
+  const host = el('admin-activity-hero');
+  if (!host) return;
+
+  const total = memberData.length;
+  const activeCount = memberData.filter(m => m.total4 >= 2).length;
+  const moderate    = memberData.filter(m => m.total4 === 1).length;
+  const inactive    = total - activeCount - moderate;
+  const avgPerWeek  = total
+    ? (memberData.reduce((s, m) => s + m.total4, 0) / total / 4).toFixed(1).replace('.', ',')
+    : '0,0';
+  const pct = n => (total ? Math.max(4, Math.round(n / total * 100)) : 0);
+
+  host.innerHTML = `
+    <div class="act-hero-label">JOUKKUEEN AKTIIVISUUS · 4 VK</div>
+    <div class="act-hero-stats">
+      <div class="act-hero-main">
+        <span class="act-hero-num">${activeCount}<small>/${total}</small></span>
+        <span class="act-hero-sub">aktiivista pelaajaa</span>
+      </div>
+      <div class="act-hero-side">
+        <span class="act-hero-num act-hero-num--sm">${avgPerWeek}</span>
+        <span class="act-hero-sub">treeniä / vk keskiarvo</span>
+      </div>
+    </div>
+    <div class="act-hero-bar">
+      <div class="act-hero-bar-seg act-hero-bar-seg--active" style="flex:${pct(activeCount)}"></div>
+      <div class="act-hero-bar-seg act-hero-bar-seg--moderate" style="flex:${pct(moderate)}"></div>
+      <div class="act-hero-bar-seg act-hero-bar-seg--inactive" style="flex:${pct(inactive)}"></div>
+    </div>`;
 }
 
 // ── CSV (portal) ──────────────────────────────────────────────

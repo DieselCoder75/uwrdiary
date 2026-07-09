@@ -2673,32 +2673,71 @@ main {
    Activity report
    ============================================================ */
 /* Aktiivisuus — korttirakenne */
+/* Yhteenveto-hero */
+.act-hero-card {
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #1444A0 0%, #1B62D4 55%, #3A82F0 100%);
+  color: #fff;
+  padding: 0.9rem 1.1rem 0.85rem;
+  margin-bottom: 0.85rem;
+  box-shadow: 0 4px 18px rgba(20,68,160,0.28);
+  overflow: hidden;
+}
+.act-hero-card:empty { display: none; }
+.act-hero-label {
+  font-size: 0.68rem; font-weight: 900; letter-spacing: 0.09em; opacity: 0.8;
+  margin-bottom: 0.5rem;
+}
+.act-hero-stats { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; }
+.act-hero-main, .act-hero-side { display: flex; flex-direction: column; gap: 2px; }
+.act-hero-side { align-items: flex-end; text-align: right; }
+.act-hero-num { font-size: 2rem; font-weight: 900; line-height: 1; }
+.act-hero-num small { font-size: 1rem; font-weight: 700; opacity: 0.7; }
+.act-hero-num--sm { font-size: 1.1rem; }
+.act-hero-sub { font-size: 0.72rem; font-weight: 700; opacity: 0.78; }
+.act-hero-bar { display: flex; gap: 4px; align-items: center; margin-top: 0.6rem; }
+.act-hero-bar-seg { height: 6px; border-radius: 99px; }
+.act-hero-bar-seg--active   { background: rgba(255,255,255,0.9); }
+.act-hero-bar-seg--moderate { background: rgba(255,255,255,0.45); }
+.act-hero-bar-seg--inactive { background: rgba(255,255,255,0.18); }
+
+.act-legend-toggle-btn {
+  background: none; border: none; padding: 0.5rem 0 0.2rem;
+  font-size: 0.78rem; font-weight: 800; color: var(--blue-mid); cursor: pointer;
+}
+
 .act-card-list {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.65rem;
   margin-top: 0.5rem;
 }
 
+/* Pelaajakortti: valkoinen kortti, status-värinen vasen reunus */
 .act-card {
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid var(--border-light);
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-light);
+  border-left: 4px solid var(--blue);
+  padding: 0.75rem 1rem;
   overflow: hidden;
 }
+.act-card--active   { border-left-color: var(--blue); }
+.act-card--moderate { border-left-color: #f59e0b; }
+.act-card--inactive { border-left-color: #ef4444; }
 
-.act-card:last-child { border-bottom: none; }
-
-/* Rivi 1: status-piste + nimi + viimeksi */
+/* Rivi 1: nimi + viimeksi */
 .act-card-row1 {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.3rem;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
 }
 
 .act-player-name {
-  font-weight: 700;
-  font-size: 0.88rem;
+  font-weight: 800;
+  font-size: 0.95rem;
   color: var(--text);
   flex: 1;
   overflow: hidden;
@@ -2707,31 +2746,49 @@ main {
 }
 
 .act-last {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--text-soft);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-/* Rivi 2: viikkopalkit */
-.act-card-row2 {
+/* Viikkonauha (12 osaa) */
+.act-weeks {
   display: flex;
-  align-items: center;
-  padding-left: 18px; /* tasataan status-pisteen kanssa */
+  gap: 3px;
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
-
-.act-count-label {
-  font-size: 0.72rem;
-  color: var(--text-soft);
-  white-space: nowrap;
-  flex-shrink: 0;
+.act-week-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 16px;
+  border-radius: 4px;
 }
+.act-week-0 { background: #c8d8ee; }
+.act-week-1 { background: #bfdbfe; }
+.act-week-2 { background: #60a5fa; }
+.act-week-3 { background: #2563eb; }
 
-.act-count-label strong {
+/* Pillerit: 4/8/12 vk treenimäärät */
+.act-pills {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.act-pill {
+  font-size: 0.78rem;
   color: var(--blue-mid);
-  font-weight: 800;
+  background: var(--blue-ghost);
+  border-radius: 99px;
+  padding: 0.3rem 0.7rem;
+  white-space: nowrap;
 }
+.act-pill strong { font-weight: 800; color: var(--blue); }
 
+/* Status-piste (käytössä selitteessä) */
 .act-status {
   display: inline-block;
   width: 10px;
@@ -2742,26 +2799,6 @@ main {
 .act-status--active   { background: var(--blue); }
 .act-status--moderate { background: #f59e0b; }
 .act-status--inactive { background: #ef4444; }
-
-.act-weeks {
-  display: flex;
-  gap: 2px;
-  flex-wrap: nowrap;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.act-week-cell {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 14px;
-  border-radius: 3px;
-}
-.act-week-0 { background: #c8d8ee; }
-.act-week-1 { background: #bfdbfe; }
-.act-week-2 { background: #60a5fa; }
-.act-week-3 { background: #2563eb; }
 
 .act-report-legend {
   display: flex;
