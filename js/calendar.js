@@ -47,6 +47,7 @@ const TEAM_EVENTS = [
   { start: '2026-09-05', end: '2026-09-06', label: 'Leiri – Seinäjoki',  dates: '5.–6.9.2026',   link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-ja-mm/' },
   { start: '2026-10-03', end: '2026-10-04', label: 'Leiri – Kokkola',     dates: '3.–4.10.2026'   },
   { start: '2026-10-24', end: '2026-10-25', label: 'Varainkeruu/Leiri – Kouvola', dates: '24.–25.10.2026' },
+  { start: '2026-12-12', end: '2026-12-13', label: 'Naisten Kierros + Leiri – Kokkola', dates: '12.–13.12.2026' },
   { start: '2027-01-23', end: '2027-01-24', label: 'SWE-FIN Camp III – Turku', dates: '23.–24.1.2027' },
   { start: '2027-05-15', end: '2027-05-22', label: 'MM-Kisat – Torremolinos', dates: '15.–22.5.2027', highlight: true },
   { start: '2025-11-09', end: '2025-11-15', label: 'EM-Kisat – Ateena 🥉', dates: '9.–15.11.2025', link: 'https://www.uppopallo.fi/uutiset/suomen-naiset-voitti-em-pronssia/' },

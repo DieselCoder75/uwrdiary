@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=431">
+  <link rel="stylesheet" href="styles.css?v=441">
 </head>
 <body>
 
@@ -340,13 +340,14 @@
       <!-- Tab: Aktiivisuus -->
       <div id="admin-tab-aktiivisuus" class="tab-content">
         <div class="admin-section">
+          <select id="admin-report-team" class="admin-select act-team-select"></select>
           <div id="admin-activity-hero" class="act-hero-card"></div>
 
           <div id="admin-activity-report">
             <p class="loading">Haetaan harjoitustietoja…</p>
           </div>
 
-          <button id="act-legend-toggle" class="act-legend-toggle-btn" type="button">Selite ?</button>
+          <button id="act-legend-toggle" class="act-legend-toggle-btn" type="button">Värien selite ⓘ</button>
           <div class="act-report-legend hidden" id="act-legend-body">
             <div class="act-legend-row">
               <span><span class="act-legend-swatch act-week-0"></span> 0 treeniä</span>
@@ -421,26 +422,6 @@
           </p>
           <button id="backup-btn" class="btn-primary" style="width:100%">Lataa varmuuskopio</button>
           <div id="backup-status" style="margin-top:0.6rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);"></div>
-        </div>
-
-        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
-          <h3 class="admin-section-title">Reaktiodatan korjaus</h3>
-          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
-            Rakentaa <code>reactionByUser</code>- ja <code>reactionCounts</code>-kentät uudelleen
-            reactions-alikollektiosta (lähde totuudesta). Korjaa duplikaatit ja vääristyneet laskurit.
-          </p>
-          <button id="fix-reactions-btn" class="btn-primary" style="width:100%">Korjaa reaktiodata</button>
-          <div id="fix-reactions-log" style="margin-top:1rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);max-height:300px;overflow-y:auto;"></div>
-        </div>
-
-        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
-          <h3 class="admin-section-title">Orporeaktioiden poisto</h3>
-          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
-            Poistaa reaktiot joiden tekijä-UID ei vastaa yhtään nykyistä käyttäjää.
-            Korjaa myös <code>reactionCounts</code> vastaamaan jäljelle jääviä reaktioita.
-          </p>
-          <button id="purge-orphan-reactions-btn" class="btn-danger-outline" style="width:100%">Poista orporeaktiot</button>
-          <div id="purge-reactions-log" style="margin-top:1rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);max-height:300px;overflow-y:auto;"></div>
         </div>
       </div>
 
@@ -1142,7 +1123,7 @@
           <p style="margin-top:0.5rem"><strong>Ylläpitäjä</strong> näkee lisäksi:</p>
           <ul>
             <li><strong>Käyttäjät</strong> — kaikkien käyttäjien hallinta; valmentajaroolin myöntäminen joukkueittain; tilin poisto</li>
-            <li><strong>Ylläpito</strong> — joukkueiden lisäys ja poisto, tietokannan varmuuskopio, reaktiodatan korjaustyökalut</li>
+            <li><strong>Ylläpito</strong> — joukkueiden lisäys ja poisto, viikkosuunnitelma, tietokannan varmuuskopio</li>
           </ul>
         </section>
 
@@ -1440,8 +1421,8 @@
   <script src="js/charts.js?v=32"></script>
   <script src="js/profile.js?v=70"></script>
   <script src="js/joukkue.js?v=15"></script>
-  <script src="js/calendar.js?v=43"></script>
-  <script src="js/admin.js?v=55"></script>
+  <script src="js/calendar.js?v=44"></script>
+  <script src="js/admin.js?v=59"></script>
   <script src="js/aicoach.js?v=18"></script>
   <script src="js/auth.js?v=23"></script>
   <script src="js/app.js?v=20"></script>

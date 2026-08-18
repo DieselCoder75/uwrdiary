@@ -67,6 +67,8 @@ body {
 #admin-portal main {
   flex: 1;
   padding: 1rem;
+  max-width: none;   /* admin-paneeli koko ruudun levyiseksi (kumoaa yleisen main 600px) */
+  width: 100%;
 }
 
 /* ============================================================
@@ -2673,6 +2675,15 @@ main {
    Activity report
    ============================================================ */
 /* Aktiivisuus — korttirakenne */
+/* Aktiivisuus-välilehti: poista .admin-sectionin ylimääräinen vaakapadding +
+   border-top → kortit levenevät samaan 1rem-marginaaliin kuin muilla sivuilla */
+#admin-tab-aktiivisuus .admin-section {
+  border-top: none;
+  padding: 0;
+}
+
+.act-team-select { width: 100%; margin-bottom: 0.85rem; }
+
 /* Yhteenveto-hero */
 .act-hero-card {
   border-radius: var(--radius);
@@ -2697,13 +2708,17 @@ main {
 .act-hero-sub { font-size: 0.72rem; font-weight: 700; opacity: 0.78; }
 .act-hero-bar { display: flex; gap: 4px; align-items: center; margin-top: 0.6rem; }
 .act-hero-bar-seg { height: 6px; border-radius: 99px; }
-.act-hero-bar-seg--active   { background: rgba(255,255,255,0.9); }
-.act-hero-bar-seg--moderate { background: rgba(255,255,255,0.45); }
-.act-hero-bar-seg--inactive { background: rgba(255,255,255,0.18); }
+/* Samat värikoodit kuin ryhmittelyssä (vihreä / keltainen / punainen) */
+.act-hero-bar-seg--active   { background: #16A34A; }
+.act-hero-bar-seg--moderate { background: #F5A623; }
+.act-hero-bar-seg--inactive { background: #E84040; }
 
 .act-legend-toggle-btn {
-  background: none; border: none; padding: 0.5rem 0 0.2rem;
-  font-size: 0.78rem; font-weight: 800; color: var(--blue-mid); cursor: pointer;
+  display: block;
+  margin: 0.7rem 0 0 auto;   /* oikealle tasattu, ei jää irralliseksi tekstiksi */
+  background: none; border: none; padding: 0.3rem 0;
+  font-size: 0.78rem; font-weight: 700; color: var(--blue-mid);
+  text-decoration: underline; cursor: pointer;
 }
 
 .act-card-list {
@@ -2723,9 +2738,22 @@ main {
   padding: 0.75rem 1rem;
   overflow: hidden;
 }
-.act-card--active   { border-left-color: var(--blue); }
-.act-card--moderate { border-left-color: #f59e0b; }
-.act-card--inactive { border-left-color: #ef4444; }
+.act-card--active   { border-left-color: #16A34A; }
+.act-card--moderate { border-left-color: #F5A623; }
+.act-card--inactive { border-left-color: #E84040; }
+
+/* Aktiivisuusryhmät (osiot) */
+.act-group { margin-bottom: 1.2rem; }
+.act-group:last-child { margin-bottom: 0; }
+.act-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.6rem 0.15rem;
+}
+.act-group-title { font-size: 0.95rem; font-weight: 800; color: var(--text); }
+.act-group-count { margin-left: auto; font-size: 0.82rem; font-weight: 700; color: var(--text-soft); }
+.act-group .act-status { width: 12px; height: 12px; }
 
 /* Rivi 1: nimi + viimeksi */
 .act-card-row1 {
@@ -2796,9 +2824,9 @@ main {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.act-status--active   { background: var(--blue); }
-.act-status--moderate { background: #f59e0b; }
-.act-status--inactive { background: #ef4444; }
+.act-status--active   { background: #16A34A; }
+.act-status--moderate { background: #F5A623; }
+.act-status--inactive { background: #E84040; }
 
 .act-report-legend {
   display: flex;

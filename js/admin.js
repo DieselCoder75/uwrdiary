@@ -167,6 +167,7 @@ async function openAdminPortal() {
   const teamsForSelects = isAdmin ? TEAMS : coachTeams;
   populateAdminTeamSelect();
   populateAdminPortalSelects(teamsForSelects, isAdmin);
+  populateActivitySelect();
   if (isAdmin) { renderAdminTeamsList(); renderWeekPlanSection(); }
 
   show('admin-portal');
@@ -192,14 +193,27 @@ function closeAdminPortal() {
   document.body.style.overflow = '';
 }
 
+// Aktiivisuus-välilehden joukkuevalitsin: admin näkee "Kaikki pelaajat" + joukkueet,
+// valmentaja vain omat joukkueensa. Oletus: admin → __all__, valmentaja → 1. joukkue.
+function populateActivitySelect() {
+  const sel = el('admin-report-team');
+  if (!sel) return;
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
+  const teams = isAdmin ? TEAMS : (userProfile.coachOf || []);
+  let html = isAdmin ? '<option value="__all__">Kaikki pelaajat</option>' : '';
+  html += teams.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  sel.innerHTML = html;
+  sel.value = isAdmin ? '__all__' : (teams[0] || '');
+}
+
 function populateAdminPortalSelects(teamsToShow = TEAMS, showAll = true) {
-  ['admin-report-team', 'admin-csv-team-portal'].forEach(id => {
+  ['admin-csv-team-portal'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     while (sel.options.length > 1) sel.remove(1);
-    // "Kaikki" option molemmissa selecteissä, mutta VAIN adminille (showAll=isAdmin).
-    // Valmentaja ei saa "Kaikki"-vaihtoehtoa → ei pääse vie­mään muiden joukkueiden dataa.
-    const includeAll = showAll && (id === 'admin-report-team' || id === 'admin-csv-team-portal');
+    // "Kaikki" option VAIN adminille (showAll=isAdmin) → valmentaja ei pääse viemään
+    // muiden joukkueiden dataa.
+    const includeAll = showAll && id === 'admin-csv-team-portal';
     if (includeAll) {
       const allOpt = document.createElement('option');
       allOpt.value = '__all__';
@@ -426,6 +440,7 @@ async function adminAddTeam() {
   if (input) input.value = '';
   renderAdminTeamsList();
   populateAdminPortalSelects();
+  populateActivitySelect();
   populateAdminTeamSelect();
   toast('Joukkue lisätty.', 'success');
 }
@@ -439,6 +454,7 @@ async function adminRemoveTeam(team) {
   await saveTeamsToFirestore();
   renderAdminTeamsList();
   populateAdminPortalSelects();
+  populateActivitySelect();
   populateAdminTeamSelect();
   toast('Joukkue poistettu.', 'success');
 }
@@ -449,7 +465,12 @@ async function saveTeamsToFirestore() {
 }
 
 // ── Activity report ───────────────────────────────────────────
-// Aktiivisuus latautuu automaattisesti (openAdminPortal) — ei joukkuevalintaa/Lataa-nappia.
+// Joukkuevalinta: oletus "Kaikki pelaajat" (__all__), raportti latautuu valinnan mukaan.
+el('admin-report-team')?.addEventListener('change', () => {
+  const team = el('admin-report-team').value;
+  if (team) renderActivityReport(team);
+});
+
 // Selite piiloon oletuksena, avautuu napista.
 el('act-legend-toggle')?.addEventListener('click', () => {
   el('act-legend-body')?.classList.toggle('hidden');
@@ -538,6 +559,18 @@ async function renderActivityReport(team, force = false) {
   renderActivityReportHtml(container, memberData, weeks);
 }
 
+// Aktiivisuusluokka — perustuu VAIN 4 edelliseen VALMISTUNEESEEN viikkoon
+// (kuluva/keskeneräinen viikko = counts:n viimeinen indeksi jätetään pois):
+//  - inactive: ei yhtään treeniä näinä 4 viikkona
+//  - active:   ainakin yksi treeni JOKAISENA näinä 4 viikkona
+//  - moderate: jotain siltä väliltä
+function activityGroup(m) {
+  const completed4 = m.counts.slice(-5, -1); // indeksit 7–10 = 4 edellistä valmista viikkoa
+  const sum = completed4.reduce((s, n) => s + n, 0);
+  if (sum === 0) return 'inactive';
+  return (completed4.length === 4 && completed4.every(n => n >= 1)) ? 'active' : 'moderate';
+}
+
 function renderActivityReportHtml(container, memberData, weeks) {
   // Restore lastDate if stored as timestamp number
   memberData.forEach(m => {
@@ -562,13 +595,7 @@ function renderActivityReportHtml(container, memberData, weeks) {
     return 'act-week-3';
   };
 
-  const statusClass = total4 => {
-    if (total4 >= 2) return 'act-card--active';
-    if (total4 >= 1) return 'act-card--moderate';
-    return 'act-card--inactive';
-  };
-
-  const rows = memberData.map(m => {
+  const cardHtml = (m, group) => {
     const squares = m.counts.map((n, i) =>
       `<div class="act-week-cell ${weekColor(n)}" title="${wHeaders[i]}: ${n} treeniä"></div>`
     ).join('');
@@ -576,7 +603,7 @@ function renderActivityReportHtml(container, memberData, weeks) {
       ? `viimeksi ${m.lastDate.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' })}`
       : 'ei treenejä';
     return `
-      <div class="act-card ${statusClass(m.total4)}">
+      <div class="act-card act-card--${group}">
         <div class="act-card-row1">
           <span class="act-player-name">${escapeHtml(m.name)}</span>
           <span class="act-last">${lastStr}</span>
@@ -588,9 +615,34 @@ function renderActivityReportHtml(container, memberData, weeks) {
           <span class="act-pill">12 vk · <strong>${m.total12}</strong></span>
         </div>
       </div>`;
+  };
+
+  // Ryhmittele
+  const byGroup = { active: [], moderate: [], inactive: [] };
+  memberData.forEach(m => byGroup[activityGroup(m)].push(m));
+
+  const GROUPS = [
+    { key: 'active',   title: 'Aktiiviset' },
+    { key: 'moderate', title: 'Kohtalaiset' },
+    { key: 'inactive', title: 'Ei aktiiviset' },
+  ];
+
+  const html = GROUPS.map(g => {
+    const list = byGroup[g.key];
+    if (!list.length) return '';
+    const n = list.length;
+    return `
+      <div class="act-group">
+        <div class="act-group-header">
+          <span class="act-status act-status--${g.key}"></span>
+          <span class="act-group-title">${g.title}</span>
+          <span class="act-group-count">${n} pelaaja${n === 1 ? '' : 'a'}</span>
+        </div>
+        <div class="act-card-list">${list.map(m => cardHtml(m, g.key)).join('')}</div>
+      </div>`;
   }).join('');
 
-  container.innerHTML = `<div class="act-card-list">${rows}</div>`;
+  container.innerHTML = html || '<p class="loading">Ei pelaajia.</p>';
 }
 
 // Yhteenveto-hero: aktiiviset/kohtalaiset/ei-aktiiviset + keskiarvo + kolmiosainen palkki
@@ -599,16 +651,16 @@ function renderActivityHero(memberData) {
   if (!host) return;
 
   const total = memberData.length;
-  const activeCount = memberData.filter(m => m.total4 >= 2).length;
-  const moderate    = memberData.filter(m => m.total4 === 1).length;
-  const inactive    = total - activeCount - moderate;
+  const activeCount = memberData.filter(m => activityGroup(m) === 'active').length;
+  const moderate    = memberData.filter(m => activityGroup(m) === 'moderate').length;
+  const inactive    = memberData.filter(m => activityGroup(m) === 'inactive').length;
   const avgPerWeek  = total
     ? (memberData.reduce((s, m) => s + m.total4, 0) / total / 4).toFixed(1).replace('.', ',')
     : '0,0';
   const pct = n => (total ? Math.max(4, Math.round(n / total * 100)) : 0);
 
   host.innerHTML = `
-    <div class="act-hero-label">JOUKKUEEN AKTIIVISUUS · 4 VK</div>
+    <div class="act-hero-label">PELAAJIEN AKTIIVISUUS · 4 VK</div>
     <div class="act-hero-stats">
       <div class="act-hero-main">
         <span class="act-hero-num">${activeCount}<small>/${total}</small></span>
@@ -821,113 +873,6 @@ async function adminDeleteUser(uid, email) {
   }
 }
 
-// ── Reaction data migration ───────────────────────────────────
-el('fix-reactions-btn').addEventListener('click', async () => {
-  const btn = el('fix-reactions-btn');
-  const log = el('fix-reactions-log');
-
-  const yes = await dangerConfirm(
-    'Korjataan reaktiodata?\n\n' +
-    '• reactionCounts rakennetaan uudelleen reactions-alikollektiosta\n' +
-    '• Jokaisen reaktorin myReactions kirjoitetaan heidän omaan käyttäjädokumenttiinsa',
-    'Korjaa'
-  );
-  if (!yes) return;
-
-  btn.disabled = true;
-  btn.textContent = 'Korjataan…';
-  log.innerHTML = '';
-
-  const addLog = (msg, color) => {
-    const div = document.createElement('div');
-    div.textContent = msg;
-    if (color) div.style.color = color;
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
-  };
-
-  try {
-    addLog('Haetaan käyttäjät…');
-    const usersSnap = await db.collection('users').get();
-
-    // Kerätään jokaisen reaktorin reaktiot: { reactorUid: { "ownerUid_entryId": emoji } }
-    const reactorMap = {};
-    let totalEntries = 0, totalEntryFixed = 0, totalErrors = 0;
-
-    for (const userDoc of usersSnap.docs) {
-      const ownerUid = userDoc.id;
-      const email    = userDoc.data().email || ownerUid;
-
-      const entriesSnap = await db.collection('users').doc(ownerUid)
-        .collection('entries').get();
-
-      for (const entryDoc of entriesSnap.docs) {
-        totalEntries++;
-        const entry = entryDoc.data();
-
-        // reactions-alikollektio on lähde totuudesta
-        const reactionsSnap = await db.collection('users').doc(ownerUid)
-          .collection('entries').doc(entryDoc.id)
-          .collection('reactions').get();
-
-        if (reactionsSnap.empty) continue;
-
-        // Rakenna oikeat reactionCounts alikollektiosta
-        const reactionCounts = {};
-        reactionsSnap.docs.forEach(rDoc => {
-          const reactorUid = rDoc.id;
-          const emoji      = rDoc.data().emoji;
-          if (!emoji) return;
-          reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
-          // Kerää reaktorin oma reaktio talteen omaan dokumenttiin kirjoitettavaksi
-          if (!reactorMap[reactorUid]) reactorMap[reactorUid] = {};
-          reactorMap[reactorUid][`${ownerUid}_${entryDoc.id}`] = emoji;
-        });
-
-        // Päivitä reactionCounts entryyn jos muuttunut
-        const curCounts = entry.reactionCounts || {};
-        if (JSON.stringify(reactionCounts) !== JSON.stringify(curCounts)) {
-          try {
-            await entryDoc.ref.update({ reactionCounts });
-            totalEntryFixed++;
-            addLog(`✓ ${email} · ${entryDoc.id.slice(0,8)}… — laskurit korjattu`, 'var(--green)');
-          } catch (err) {
-            totalErrors++;
-            addLog(`✗ ${email} · ${entryDoc.id.slice(0,8)}… — ${err.message}`, 'var(--red)');
-          }
-        }
-      }
-    }
-
-    // Kirjoita myReactions jokaisen reaktorin omaan dokumenttiin (admin-oikeus sallii tämän)
-    addLog(`\nKirjoitetaan myReactions ${Object.keys(reactorMap).length} käyttäjälle…`);
-    let reactorFixed = 0;
-    for (const [reactorUid, reactions] of Object.entries(reactorMap)) {
-      try {
-        await db.collection('users').doc(reactorUid).update({ myReactions: reactions });
-        reactorFixed++;
-        addLog(`✓ reaktori ${reactorUid.slice(0,8)}… — ${Object.keys(reactions).length} reaktiota`, 'var(--green)');
-      } catch (err) {
-        totalErrors++;
-        addLog(`✗ reaktori ${reactorUid.slice(0,8)}… — ${err.message}`, 'var(--red)');
-      }
-    }
-
-    addLog(
-      `\nValmis! Tarkistettu ${totalEntries} treeniä · korjattu ${totalEntryFixed} laskuria · ` +
-      `myReactions päivitetty ${reactorFixed}/${Object.keys(reactorMap).length} käyttäjälle · virheitä ${totalErrors}.`,
-      totalErrors > 0 ? 'var(--red)' : 'var(--green)'
-    );
-
-  } catch (err) {
-    console.error('fixReactionData:', err);
-    addLog('Kriittinen virhe: ' + err.message, 'var(--red)');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Korjaa reaktiodata';
-  }
-});
-
 // ── Full JSON backup ──────────────────────────────────────────
 el('backup-btn').addEventListener('click', async () => {
   const btn    = el('backup-btn');
@@ -1019,103 +964,6 @@ el('backup-btn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Lataa varmuuskopio';
-  }
-});
-
-// ── Orphan reaction purge ─────────────────────────────────────
-el('purge-orphan-reactions-btn').addEventListener('click', async () => {
-  const btn = el('purge-orphan-reactions-btn');
-  const log = el('purge-reactions-log');
-
-  const yes = await dangerConfirm(
-    'Korjataan reaktiodata poistamalla orporeaktiot?\n\n' +
-    'Toiminto poistaa reaktiodokumentit joiden tekijää ei enää ole käyttäjissä ja korjaa reactionCounts.',
-    'Korjaa'
-  );
-  if (!yes) return;
-
-  btn.disabled = true;
-  btn.textContent = 'Poistetaan…';
-  log.innerHTML = '';
-
-  const addLog = (msg, color) => {
-    const div = document.createElement('div');
-    div.textContent = msg;
-    if (color) div.style.color = color;
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
-  };
-
-  try {
-    // 1. Kerää kaikki nykyiset käyttäjä-UIdit
-    addLog('Haetaan käyttäjät…');
-    const usersSnap = await db.collection('users').get();
-    const validUids = new Set(usersSnap.docs.map(d => d.id));
-    addLog(`Löydettiin ${validUids.size} käyttäjää.`);
-
-    let totalScanned = 0, totalDeleted = 0, totalFixed = 0, totalErrors = 0;
-
-    // 2. Käy läpi jokaisen käyttäjän jokainen entry
-    for (const userDoc of usersSnap.docs) {
-      const ownerUid = userDoc.id;
-      const email    = userDoc.data().email || ownerUid;
-
-      const entriesSnap = await db.collection('users').doc(ownerUid)
-        .collection('entries').get();
-
-      for (const entryDoc of entriesSnap.docs) {
-        const reactionsSnap = await db.collection('users').doc(ownerUid)
-          .collection('entries').doc(entryDoc.id)
-          .collection('reactions').get();
-
-        if (reactionsSnap.empty) continue;
-        totalScanned++;
-
-        // 3. Etsi orporeaktiot (reactorUid ei löydy validUids:stä)
-        const orphans = reactionsSnap.docs.filter(r => !validUids.has(r.id));
-        if (orphans.length === 0) continue;
-
-        // 4. Poista orporeaktiot ja laske jäljelle jäävät counts
-        const remainingCounts = {};
-        reactionsSnap.docs.forEach(r => {
-          if (validUids.has(r.id) && r.data().emoji) {
-            const e = r.data().emoji;
-            remainingCounts[e] = (remainingCounts[e] || 0) + 1;
-          }
-        });
-
-        try {
-          const batch = db.batch();
-          orphans.forEach(r => batch.delete(r.ref));
-          batch.update(entryDoc.ref, { reactionCounts: remainingCounts });
-          await batch.commit();
-
-          totalDeleted += orphans.length;
-          totalFixed++;
-          const orphanUids = orphans.map(r => r.id.slice(0, 8) + '…').join(', ');
-          addLog(
-            `✓ ${email} · ${entryDoc.id.slice(0,8)}… — poistettu ${orphans.length} orphan (${orphanUids})`,
-            'var(--green)'
-          );
-        } catch (err) {
-          totalErrors++;
-          addLog(`✗ ${email} · ${entryDoc.id.slice(0,8)}… — ${err.message}`, 'var(--red)');
-        }
-      }
-    }
-
-    addLog(
-      `\nValmis! Tarkistettu ${totalScanned} treeniä reaktioineen · poistettu ${totalDeleted} orphania · ` +
-      `korjattu ${totalFixed} entryn laskurit · virheitä ${totalErrors}.`,
-      totalErrors > 0 ? 'var(--red)' : 'var(--green)'
-    );
-
-  } catch (err) {
-    console.error('purgeOrphanReactions:', err);
-    addLog('Kriittinen virhe: ' + err.message, 'var(--red)');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Poista orporeaktiot';
   }
 });
 
