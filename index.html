@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=441">
+  <link rel="stylesheet" href="styles.css?v=446">
 </head>
 <body>
 
@@ -422,6 +422,34 @@
           </p>
           <button id="backup-btn" class="btn-primary" style="width:100%">Lataa varmuuskopio</button>
           <div id="backup-status" style="margin-top:0.6rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);"></div>
+        </div>
+
+        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
+          <h3 class="admin-section-title">📊 Sheets-vienti</h3>
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.85rem;">
+            Puskee treenit Google Sheetiin ilman että lataus kuluttaa lukukiintiötä.
+            <b>Alkulataus</b> hakee vanhimmat treenit (≤5000 lukua/vrk) kunnes ollaan 30 pv:n
+            päässä tästä päivästä; sen jälkeen <b>ylläpito</b> (≤1000 lukua/vrk) tuo uudet ja
+            korjaa muuttuneet/poistetut. Paina Päivitä kerran per vuorokausi.
+          </p>
+
+          <details class="export-cfg" style="margin-bottom:0.85rem;">
+            <summary style="font-size:0.82rem;color:var(--text-muted);cursor:pointer;">Asetukset (Web App -URL & salasana)</summary>
+            <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.5rem;">
+              <input type="text" id="export-url" class="admin-input" placeholder="Apps Script Web App -URL" autocomplete="off">
+              <input type="password" id="export-secret" class="admin-input" placeholder="Jaettu salasana (secret)" autocomplete="off">
+              <input type="text" id="export-sheet-url" class="admin-input" placeholder="Sheetin URL (valinnainen, avaa-linkkiä varten)" autocomplete="off">
+              <button class="btn-secondary" onclick="exportSaveCfg()">Tallenna asetukset</button>
+              <p style="font-size:0.72rem;color:var(--text-muted);margin:0;">Tallennetaan vain tähän selaimeen (localStorage), ei julkiseen koodiin.</p>
+            </div>
+          </details>
+
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button id="export-run-btn" class="btn-primary" style="flex:1;min-width:140px" onclick="runSheetExport()">Päivitä Sheet</button>
+            <button id="export-tests-btn" class="btn-secondary" style="flex:1;min-width:140px" onclick="runTestExport()">Päivitä testit</button>
+          </div>
+          <a id="export-sheet-link" class="hidden" href="#" target="_blank" rel="noopener" style="display:inline-block;margin-top:0.6rem;font-size:0.82rem;color:var(--blue);">Avaa Sheet ↗</a>
+          <div id="export-status" style="margin-top:0.6rem;font-size:0.8rem;font-family:monospace;color:var(--text-muted);"></div>
         </div>
       </div>
 
@@ -1411,7 +1439,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="js/config.js?v=19"></script>
+  <script src="js/config.js?v=20"></script>
   <script src="js/state.js?v=4"></script>
   <script src="js/cache.js?v=2"></script>
   <script src="js/utils.js?v=6"></script>
@@ -1421,8 +1449,9 @@
   <script src="js/charts.js?v=32"></script>
   <script src="js/profile.js?v=70"></script>
   <script src="js/joukkue.js?v=15"></script>
-  <script src="js/calendar.js?v=44"></script>
-  <script src="js/admin.js?v=59"></script>
+  <script src="js/calendar.js?v=48"></script>
+  <script src="js/admin.js?v=65"></script>
+  <script src="js/export.js?v=1"></script>
   <script src="js/aicoach.js?v=18"></script>
   <script src="js/auth.js?v=23"></script>
   <script src="js/app.js?v=20"></script>

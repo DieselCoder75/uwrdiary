@@ -239,6 +239,7 @@ document.querySelectorAll('[data-admin-tab]').forEach(btn => {
       el('admin-tab-' + t).classList.toggle('hidden', t !== tab);
     });
     if (tab === 'kayttajat') loadAdminUserListPortal();
+    if (tab === 'yllapito' && typeof exportInitPanel === 'function') exportInitPanel();
   });
 });
 
@@ -766,7 +767,8 @@ async function renderCsvPlayerList(team) {
 
   // Viikkosuunnitelma
   onClick('admin-week-plan-list', (act, btn) => {
-    if (act === 'edit-zone') openZonePicker(btn.dataset.key, Number(btn.dataset.week), btn.dataset.zone);
+    if (act === 'edit-zone')  openZonePicker(btn.dataset.key, Number(btn.dataset.week), btn.dataset.zone);
+    if (act === 'edit-voima') openVoimaPicker(btn.dataset.key, Number(btn.dataset.week), btn.dataset.voima);
   });
 
   // Tehoaluevalitsin
@@ -969,7 +971,7 @@ el('backup-btn').addEventListener('click', async () => {
 
 // ── Viikkosuunnitelma ─────────────────────────────────────────
 const ZONE_OPTIONS = ['I', 'I–II', 'II', 'II–III', 'III', 'III–IV', 'IV', 'I–V', 'V'];
-let zonePicking = null; // { weekKey, weekNum }
+let zonePicking = null; // { weekKey, weekNum, mode: 'zone' | 'voima' }
 
 function renderWeekPlanSection() {
   const container = el('admin-week-plan-list');
@@ -987,15 +989,31 @@ function renderWeekPlanSection() {
     const { week, year } = calIsoWeekData(monday);
     const key = `${year}-W${String(week).padStart(2, '0')}`;
 
-    // Käytä dynaamista suunnitelmaa, fallback kovakoodattuun
+    // Tehoalue: dynaaminen suunnitelma → kovakoodattu
     let zone = '';
     if (key in dynamicWeekPlan) zone = dynamicWeekPlan[key] || '';
     else zone = WEEKLY_PLAN[year]?.[week] || '';
+    const zoneSource = (key in dynamicWeekPlan) ? 'custom' : (zone ? 'default' : 'none');
+
+    // Voimaviikko: dynaaminen → kovakoodattu → johdettu tehoalueesta
+    let voima = '';
+    if (key in dynamicVoimaPlan) voima = dynamicVoimaPlan[key] || '';
+    else voima = (VOIMA_PLAN[year]?.[week]) || deriveVoimaFromZone(zone) || '';
+    const voimaSource = (key in dynamicVoimaPlan) ? 'custom' : (voima ? 'default' : 'none');
 
     const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
     const fmt = d => `${d.getDate()}.${d.getMonth() + 1}.`;
     const isCurrent = i === 0;
-    const source = (key in dynamicWeekPlan) ? 'custom' : (zone ? 'default' : 'none');
+
+    const ctrl = (label, val, src, act, dataAttr) => `
+      <div class="week-plan-ctrl">
+        <span class="week-plan-ctrl-label">${label}</span>
+        ${val
+          ? `<span class="week-plan-badge week-plan-${src}">${escapeHtml(val)}</span>`
+          : `<span class="week-plan-empty">—</span>`}
+        <button class="btn-secondary week-plan-edit-btn"
+                data-act="${act}" data-key="${escapeHtml(key)}" data-week="${week}" ${dataAttr}>Muokkaa</button>
+      </div>`;
 
     rows.push(`
       <div class="week-plan-row${isCurrent ? ' week-plan-current' : ''}">
@@ -1003,13 +1021,10 @@ function renderWeekPlanSection() {
           <span class="week-plan-num">Vk ${week}${isCurrent ? '<span class="week-plan-now"> ← nyt</span>' : ''}</span>
           <span class="week-plan-dates">${fmt(monday)}–${fmt(sunday)}${year}</span>
         </div>
-        <div class="week-plan-zone-col">
-          ${zone
-            ? `<span class="week-plan-badge week-plan-${source}">${zone}</span>`
-            : `<span class="week-plan-empty">—</span>`}
+        <div class="week-plan-controls">
+          ${ctrl('Tehoalue', zone, zoneSource, 'edit-zone', `data-zone="${escapeHtml(zone)}"`)}
+          ${ctrl('Voimaviikko', voima, voimaSource, 'edit-voima', `data-voima="${escapeHtml(voima)}"`)}
         </div>
-        <button class="btn-secondary week-plan-edit-btn"
-                data-act="edit-zone" data-key="${escapeHtml(key)}" data-week="${week}" data-zone="${escapeHtml(zone)}">Muokkaa</button>
       </div>`);
   }
 
@@ -1017,15 +1032,24 @@ function renderWeekPlanSection() {
 }
 
 function openZonePicker(weekKey, weekNum, currentZone) {
-  zonePicking = { weekKey, weekNum };
-  el('zone-picker-title').textContent = `Viikko ${weekNum} — tehoalue`;
+  _openPlanPicker('zone', weekKey, weekNum, currentZone);
+}
+function openVoimaPicker(weekKey, weekNum, currentVoima) {
+  _openPlanPicker('voima', weekKey, weekNum, currentVoima);
+}
 
-  el('zone-picker-buttons').innerHTML = ZONE_OPTIONS.map(z => `
-    <button class="zone-opt-btn${z === currentZone ? ' active' : ''}"
-            data-act="select-zone" data-zone="${escapeHtml(z)}">${z}</button>
+function _openPlanPicker(mode, weekKey, weekNum, current) {
+  zonePicking = { weekKey, weekNum, mode };
+  const opts  = mode === 'voima' ? VOIMA_OPTIONS : ZONE_OPTIONS;
+  el('zone-picker-title').textContent =
+    `Viikko ${weekNum} — ${mode === 'voima' ? 'voimaviikko' : 'tehoalue'}`;
+
+  el('zone-picker-buttons').innerHTML = opts.map(z => `
+    <button class="zone-opt-btn${z === current ? ' active' : ''}"
+            data-act="select-zone" data-zone="${escapeHtml(z)}">${escapeHtml(z)}</button>
   `).join('');
 
-  el('zone-picker-clear').classList.toggle('hidden', !currentZone);
+  el('zone-picker-clear').classList.toggle('hidden', !current);
 
   el('zone-picker-backdrop').classList.remove('hidden');
   const sheet = el('zone-picker-sheet');
@@ -1043,9 +1067,11 @@ function closeZonePicker() {
   zonePicking = null;
 }
 
-async function selectZone(zone) {
+async function selectZone(val) {
   if (!zonePicking) return;
-  dynamicWeekPlan[zonePicking.weekKey] = zone;
+  const { weekKey, mode } = zonePicking;
+  if (mode === 'voima') dynamicVoimaPlan[weekKey] = val;
+  else dynamicWeekPlan[weekKey] = val;
   closeZonePicker();
   await saveWeekPlanToFirestore();
   renderWeekPlanSection();
@@ -1053,8 +1079,10 @@ async function selectZone(zone) {
 
 async function clearZone() {
   if (!zonePicking) return;
-  // Poista dynaaminen arvo — palautuu kovakoodattuun jos sellainen on
-  delete dynamicWeekPlan[zonePicking.weekKey];
+  const { weekKey, mode } = zonePicking;
+  // Poista dynaaminen arvo — palautuu kovakoodattuun / johdettuun jos sellainen on
+  if (mode === 'voima') delete dynamicVoimaPlan[weekKey];
+  else delete dynamicWeekPlan[weekKey];
   closeZonePicker();
   await saveWeekPlanToFirestore();
   renderWeekPlanSection();
@@ -1062,7 +1090,8 @@ async function clearZone() {
 
 async function saveWeekPlanToFirestore() {
   try {
-    await db.collection('settings').doc('app').set({ weekPlan: dynamicWeekPlan }, { merge: true });
+    await db.collection('settings').doc('app')
+      .set({ weekPlan: dynamicWeekPlan, voimaPlan: dynamicVoimaPlan }, { merge: true });
     appSettingsLoaded = false;  // pakota seuraava lataus lukemaan uudet arvot
     calLoadedForUid   = null;   // pakota kalenterin uudelleenpiirto
     toast('Suunnitelma tallennettu.', 'success');
@@ -1241,6 +1270,100 @@ function _viikkoohjeZoneHtml(zoneStr) {
   return `<p>${data.intro}</p>${sectionsHtml}`;
 }
 
+// ─── Voimaviikon ohjeistus ────────────────────────────────────
+const _VOIMA_DATA = {
+  'Haltuunotto': {
+    label: 'Haltuunottoviikko',
+    intro: 'Uuden saliohjelman haltuunotto: käydään liikkeet läpi ja opetellaan puhdas tekniikka. Valitse painot niin kevyiksi, että sarjan lopussa jaksaisit vielä 3–4 toistoa lisää — ne 3–4 jätät kuitenkin tekemättä (eli jäävät "reserviin"). Tavoite on oppia liikkeet ja löytää sopivat työskentelypainot, ei mennä äärirajoille.',
+    kuorma: 'kevyt, tekniikka edellä',
+    palautus: '2–3 min',
+    maara: '2–3 salitreeniä',
+    items: [
+      '✅ Opettele jokainen liike puhtaasti ennen kuin lisäät painoa',
+      '✅ Valitse kuorma, jolla lopussa jäisi vielä 3–4 toistoa reserviin',
+      '✅ Kirjaa käytetyt painot ylös — ne ovat lähtötaso tuleville viikoille',
+    ],
+  },
+  'Volyymi': {
+    label: 'Volyymiviikko',
+    intro: 'Teemana lihasmassa ja kuormankantokyky. Raskasta mutta hallittua: valitse kuorma, jolla sarjan lopussa jäisi vielä 1–2 toistoa reserviin.',
+    kuorma: '70–80 % maksimista',
+    palautus: '2–3 min',
+    maara: '2–3 salitreeniä',
+    items: [
+      '✅ Alavartalon pääliike: esim. kyykky tai maastaveto',
+      '✅ Ylävartalon pääliike: esim. leuanveto tai penkki-/pystypunnerrus',
+      '✅ Tukiliikkeet ohjelman omilla toistomäärillä',
+    ],
+  },
+  'Voima': {
+    label: 'Voimaviikko',
+    intro: 'Maksimivoiman viikko — kilot nousevat. Mennään lähelle rajaa: viimeisessä sarjassa saa tulla örinää, muissa jää 1–2 toistoa reserviin. Tekniikka silti edellä.',
+    kuorma: '80–90 % maksimista',
+    palautus: '3–4 min',
+    maara: '2–3 salitreeniä',
+    items: [
+      '✅ Alavartalon pääliike raskaana',
+      '✅ Ylävartalon pääliike raskaana',
+      '✅ Uskalla lisätä painoa, mutta pidä liike puhtaana',
+    ],
+  },
+  'Räjähtävyys': {
+    label: 'Räjähtävyysviikko',
+    intro: 'Vireys ylös, ei kipeytymistä. Kevyttä rautaa maksimaalisella toistonopeudella — lopeta sarja heti kun vauhti hidastuu. Yksi lyhyt treeni riittää.',
+    kuorma: '50–65 % maksimista',
+    palautus: '2 min',
+    maara: '1 lyhyt salitreeni (30–40 min)',
+    items: [
+      '✅ Pääliikkeet nopeilla, räjähtävillä toistoilla',
+      '✅ Hypyt ja heitot, esim. 5 × 3',
+      '✅ Lopeta sarja kun toistonopeus hidastuu',
+    ],
+  },
+  'Kevennys': {
+    label: 'Kevennysviikko',
+    intro: 'Kevyt paluu tai kilpailukevennys. Volyymi alas, mutta kilot ja nopeus säilyvät — tavoite on vireys, ei väsytys.',
+    kuorma: '70–80 % maksimista',
+    palautus: 'täysi',
+    maara: '1–2 lyhyttä salitreeniä',
+    items: [
+      '✅ Pääliikkeet terävästi, vähän sarjoja',
+      '✅ Lyhyt aktivointi 20–30 min',
+      '✅ Ei maksimiyrityksiä',
+    ],
+  },
+};
+
+// Sama joka viikko: selventää mitä sarjat × toistot -luku koskee.
+const _VOIMA_NOTE = 'Sarjat × toistot koskee pääliikkeitä (yksi alavartalon ja yksi ylävartalon liike). Tukiliikkeet tehdään ohjelman omilla toistomäärillä.';
+
+function _viikkoohjeVoimaHtml(type, monday) {
+  const data = _VOIMA_DATA[type];
+  if (!data) return '';
+  const { week, year } = calIsoWeekData(monday);
+  const jakso  = typeof voimaJakso === 'function' ? voimaJakso(year, week) : null;
+  const sarjat = typeof voimaSets  === 'function' ? voimaSets(type, jakso) : '';
+
+  const subtitle = [
+    sarjat ? `Pääliikkeet ${sarjat}` : '',
+    `Kuorma ${data.kuorma}`,
+    `Palautus ${data.palautus}`,
+    data.maara,
+  ].filter(Boolean).join(' · ');
+
+  const itemsHtml = data.items.length
+    ? `<ul>${data.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : '';
+
+  return `
+    <div class="viikkoohje-voima">
+      <h4>Voimaharjoittelu — ${escapeHtml(data.label)}</h4>
+      <p class="viikkoohje-subtitle">${escapeHtml(subtitle)}</p>
+      <p>${escapeHtml(data.intro)}</p>
+      ${itemsHtml}
+      <p class="viikkoohje-voima-note">${escapeHtml(_VOIMA_NOTE)}</p>
+    </div>`;
+}
+
 function _viikkoohjeUpcomingHtml(currentMonday) {
   const rows = [1, 2, 3].map(offset => {
     const mon = weeksAgoMonday(-offset);
@@ -1291,21 +1414,26 @@ function renderViikkoOhjeTab() {
   const { week } = calIsoWeekData(monday);
   const zone = calPlannedZone(monday);
 
+  const voima = typeof calVoimaType === 'function' ? calVoimaType(monday) : null;
+
   let bodyHtml;
   if (!zone) {
     bodyHtml = `<p>Viikolle ${week} ei ole asetettu tehoaluetta viikkosuunnitelmassa. Avaa Kalenteri-välilehti ja lisää tehoalue viikolle.</p>`;
   } else {
     bodyHtml = _viikkoohjeZoneHtml(zone);
   }
+  if (voima) bodyHtml += _viikkoohjeVoimaHtml(voima, monday);
 
   const zoneNums  = zone ? parseZoneStr(zone) : [];
   const zoneName  = zoneNums.map(z => _ZONE_DATA[z]?.name).filter(Boolean).join(' / ');
-  const titleZone = zoneName ? ` – ${zoneName}` : '';
+  const voimaName = voima ? (_VOIMA_DATA[voima]?.label || `${voima}viikko`) : '';
+  const titleBits = [zoneName, voimaName].filter(Boolean).join(' · ');
+  const titleTail = titleBits ? ` · ${titleBits}` : '';
 
   container.innerHTML = `
     <div class="viikkoohje-toggle">${toggleHtml}</div>
     <div class="viikkoohje-card">
-      <h4 class="viikkoohje-week-title">Viikko ${week}${titleZone}</h4>
+      <h4 class="viikkoohje-week-title">Viikko ${week}${titleTail}</h4>
       <div class="viikkoohje-output">${bodyHtml}</div>
     </div>
   `;
@@ -1326,5 +1454,6 @@ window.adminRemoveTeam         = adminRemoveTeam;
 window.renderCsvPlayerList     = renderCsvPlayerList;
 window.loadAdminUserListPortal = loadAdminUserListPortal;
 window.openZonePicker          = openZonePicker;
+window.openVoimaPicker         = openVoimaPicker;
 window.selectZone              = selectZone;
 window.clearZone               = clearZone;

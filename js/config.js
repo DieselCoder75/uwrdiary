@@ -130,6 +130,11 @@ let TEAMS = ['Naisten Maajoukkue', 'Urheilusukeltajat', 'PSK-Kupla'];
 // Overrides the hardcoded WEEKLY_PLAN in calendar.js
 let dynamicWeekPlan = {};
 
+// Dynamic weekly strength-block plan loaded from Firestore settings/app.voimaPlan
+// Format: { "2026-W38": "Voima", "2026-W39": "Räjähtävyys" }
+// Overrides the hardcoded VOIMA_PLAN in calendar.js
+let dynamicVoimaPlan = {};
+
 // Load app-wide settings from Firestore (teams list + week plan)
 // Guarded so repeated calls (auth + portal open) only hit Firestore once per session.
 let appSettingsLoaded = false;
@@ -141,6 +146,7 @@ async function loadAppSettings() {
       const data = doc.data();
       if (Array.isArray(data.teams) && data.teams.length > 0) TEAMS = data.teams;
       if (data.weekPlan && typeof data.weekPlan === 'object') dynamicWeekPlan = data.weekPlan;
+      if (data.voimaPlan && typeof data.voimaPlan === 'object') dynamicVoimaPlan = data.voimaPlan;
     }
     appSettingsLoaded = true;
   } catch (err) {

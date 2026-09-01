@@ -2600,6 +2600,34 @@ main {
   border-radius: 99px;
 }
 
+/* Kaksi kontrollia per viikkorivi: Tehoalue + Voimaviikko */
+.week-plan-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.week-plan-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+.week-plan-ctrl-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  min-width: 4.5rem;
+  text-align: right;
+}
+.week-plan-ctrl .week-plan-badge,
+.week-plan-ctrl .week-plan-empty {
+  min-width: 5.5rem;
+  text-align: center;
+}
+
 /* ── Zone picker sheet ───────────────────────────────────────── */
 .zone-picker-grid {
   display: grid;
@@ -4404,6 +4432,15 @@ details[open] .form-extra-toggle::after {
 .viikkoohje-output p  { margin: 0 0 8px; }
 .viikkoohje-output ul { margin: 4px 0 10px; padding-left: 0.4rem; list-style: none; }
 .viikkoohje-output li { margin-bottom: 5px; }
+
+/* Voimaharjoittelu-osio viikko-ohjeen pohjalla — sama tyyli kuin tehoalueosiot */
+.viikkoohje-voima h4 { margin-top: 18px; }
+.viikkoohje-voima-note {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  font-style: italic;
+  margin: 2px 0 8px !important;
+}
 
 .viikkoohje-note {
   font-size: 0.83rem;

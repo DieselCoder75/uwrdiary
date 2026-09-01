@@ -45,10 +45,11 @@ const TEAM_EVENTS = [
   { start: '2026-06-13', end: '2026-06-14', label: 'Leiri – Leppävaara',  dates: '13.–14.6.2026', link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-leppa-2/' },
   { start: '2026-08-15', end: '2026-08-16', label: 'Leiri – Kumpula',    dates: '15.–16.8.2026', link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-kumpu/' },
   { start: '2026-09-05', end: '2026-09-06', label: 'Leiri – Seinäjoki',  dates: '5.–6.9.2026',   link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-ja-mm/' },
-  { start: '2026-10-03', end: '2026-10-04', label: 'Leiri – Kokkola',     dates: '3.–4.10.2026'   },
+  { start: '2026-10-03', end: '2026-10-04', label: 'Leiri – Kokkola',     dates: '3.–4.10.2026', link: 'https://www.uppopallo.fi/uutiset/naisten-avoin-maajoukkueleiri-kokko/' },
   { start: '2026-10-24', end: '2026-10-25', label: 'Varainkeruu/Leiri – Kouvola', dates: '24.–25.10.2026' },
-  { start: '2026-12-12', end: '2026-12-13', label: 'Naisten Kierros + Leiri – Kokkola', dates: '12.–13.12.2026' },
+  { start: '2026-12-12', end: '2026-12-13', label: 'Kierros/Leiri – Kokkola', dates: '12.–13.12.2026' },
   { start: '2027-01-23', end: '2027-01-24', label: 'SWE-FIN Camp III – Turku', dates: '23.–24.1.2027' },
+  { start: '2027-04-24', end: '2027-04-25', label: 'Leiri – Turku',           dates: '24.–25.4.2027' },
   { start: '2027-05-15', end: '2027-05-22', label: 'MM-Kisat – Torremolinos', dates: '15.–22.5.2027', highlight: true },
   { start: '2025-11-09', end: '2025-11-15', label: 'EM-Kisat – Ateena 🥉', dates: '9.–15.11.2025', link: 'https://www.uppopallo.fi/uutiset/suomen-naiset-voitti-em-pronssia/' },
 ];
@@ -140,6 +141,74 @@ function calDateKey(date) {
 function parseZoneStr(zoneStr) {
   const map = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5 };
   return zoneStr.split(/[–-]/).map(s => map[s.trim()]).filter(Boolean);
+}
+
+// ─── Voimaviikko (salin viikkotyyppi) ─────────────────────────
+// Salin viikkotyyppi johdetaan tehoalueesta, mutta se voidaan asettaa myös
+// erikseen. Oletukset dokumentin "Voimaharjoituskalenteri – Syksy 2026" mukaan.
+const VOIMA_OPTIONS = ['Haltuunotto', 'Volyymi', 'Voima', 'Räjähtävyys', 'Kevennys'];
+
+// ISO-viikko → voimaviikkotyyppi (kovakoodattu oletus; dynamicVoimaPlan ohittaa)
+const VOIMA_PLAN = {
+  2026: {
+    34: 'Haltuunotto', 35: 'Haltuunotto', 36: 'Räjähtävyys',
+    37: 'Volyymi',     38: 'Voima',       39: 'Räjähtävyys',
+    40: 'Volyymi',     41: 'Voima',       42: 'Räjähtävyys',
+    43: 'Volyymi',     44: 'Voima',       45: 'Räjähtävyys',
+    46: 'Volyymi',     47: 'Voima',       48: 'Räjähtävyys',
+    49: 'Volyymi',     50: 'Kevennys',    51: 'Räjähtävyys',
+    52: 'Volyymi',     53: 'Voima',
+  }
+};
+
+// Tehoalue → voimaviikon oletustyyppi (kun ei suunnitelmaa)
+function deriveVoimaFromZone(zoneStr) {
+  if (!zoneStr) return null;
+  const zones = parseZoneStr(zoneStr);
+  const primary = zones.length ? Math.max(...zones) : 0;
+  if (primary === 3) return 'Voima';
+  if (primary === 4) return 'Räjähtävyys';
+  if (primary >= 1) return 'Volyymi'; // I, II, V
+  return null;
+}
+
+// Viikon voimaviikkotyyppi: dynaaminen suunnitelma → kovakoodattu → johdettu
+function calVoimaType(monday) {
+  const key = calWeekKey(monday);
+  if (key in dynamicVoimaPlan) return dynamicVoimaPlan[key] || null;
+  const { week, year } = calIsoWeekData(monday);
+  if (VOIMA_PLAN[year]?.[week]) return VOIMA_PLAN[year][week];
+  return deriveVoimaFromZone(calPlannedZone(monday));
+}
+
+// Kauden jakso (määrää pääliikkeiden sarjaskeeman)
+function voimaJakso(year, week) {
+  if (year === 2026) {
+    if (week >= 34 && week <= 36) return 0; // Haltuunotto
+    if (week >= 37 && week <= 42) return 1; // Perusvoima
+    if (week >= 43 && week <= 47) return 2; // Maksimivoima I
+    if (week >= 48 && week <= 49) return 3; // Kilpailukevennys
+    if (week >= 50 && week <= 51) return 4; // Uudelleenlataus
+    if (week >= 52)               return 5; // Talven voimablokki
+  }
+  if (year === 2027) {
+    if (week <= 8)                return 5;
+    if (week >= 9  && week <= 15) return 6; // Voiman muunto tehoksi
+    if (week >= 16 && week <= 20) return 7; // MM-kevennys
+  }
+  return null;
+}
+
+// Pääliikkeiden sarjat × toistot voimaviikkotyypin + jakson mukaan
+function voimaSets(type, jakso) {
+  switch (type) {
+    case 'Haltuunotto': return '3 × 10';
+    case 'Volyymi':     return (jakso != null && jakso >= 2) ? '4 × 6' : '4 × 8';
+    case 'Voima':       return (jakso != null && jakso >= 2) ? '6 × 3' : '5 × 5';
+    case 'Räjähtävyys': return '4 × 3';
+    case 'Kevennys':    return '3 × 8';
+    default:            return '';
+  }
 }
 
 // Palauttaa 'ok', 'fail' tai null (ei arvioida)
