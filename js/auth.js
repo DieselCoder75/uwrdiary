@@ -73,6 +73,8 @@ const SPLASH_LOGO_IMAGES = [
   'img/splash/splash-5.png',
   'img/splash/splash-6.png',
   'img/splash/splash-7.png',
+  'img/splash/splash-8.png',
+  'img/splash/splash-9.png',
 ];
 
 const SPLASH_FALLBACK     = 'icon-512.png';
