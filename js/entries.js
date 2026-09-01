@@ -420,7 +420,8 @@ function renderWeekSummaryCard() {
   // calPlannedZone palauttaa merkkijonon ('IV', 'I–II' jne.) tai null
   const { week } = calIsoWeekData(monday);
   const zone     = typeof calPlannedZone === 'function' ? calPlannedZone(monday) : null;
-  const _zoneNum  = zone ? Math.max(...parseZoneStr(zone)) : 0;
+  const _zones    = zone ? parseZoneStr(zone) : [];
+  const _zoneNum  = _zones.length ? Math.max(..._zones) : 0;
   const _zoneName = _zoneNum ? PERF_LABELS[_zoneNum].split(' – ')[1] : '';
   const weekLabel = zone
     ? (_zoneName ? `${_zoneName} · ${zone} · vk ${week}` : `${zone} · vk ${week}`)
@@ -494,7 +495,8 @@ function pastWeekSummaryHtml(docs, monday) {
   const thisYear = new Date().getFullYear();
   const yearSuffix = year !== thisYear ? ` ${year}` : '';
   const zone = (typeof calPlannedZone === 'function') ? calPlannedZone(monday) : null;
-  const _pZoneNum  = zone ? Math.max(...parseZoneStr(zone)) : 0;
+  const _pZones    = zone ? parseZoneStr(zone) : [];
+  const _pZoneNum  = _pZones.length ? Math.max(..._pZones) : 0;
   const _pZoneName = _pZoneNum ? PERF_LABELS[_pZoneNum].split(' – ')[1] : '';
   const rightLabel = zone
     ? (_pZoneName ? `${_pZoneName} · ${zone} · vk ${week}${yearSuffix}` : `${zone} · vk ${week}${yearSuffix}`)

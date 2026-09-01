@@ -227,11 +227,21 @@ async function renderJoukkueTab(force = false) {
       // Cache feed
       try {
         localStorage.setItem(cacheStoreKey,
-          JSON.stringify({ ts: now, data: rawItems.map(item => ({
-            ...item,
-            profile: { ...item.profile, avatar: undefined },
-            entry:   { ...item.entry, date: item.entry.date?.toMillis?.() ?? item.entry.date },
-          })) }));
+          JSON.stringify({ ts: now, data: rawItems.map(item => {
+            // Älä tallenna yksityisiä/jakamattomia kommentteja selkokielisenä
+            // localStorageen (yksityisyys). Jätetään vain jos ne oikeasti näytetään.
+            const canShowComment = item.profile.shareComments && !item.entry.privateComment;
+            return {
+              ...item,
+              profile: { ...item.profile, avatar: undefined },
+              entry:   {
+                ...item.entry,
+                date: item.entry.date?.toMillis?.() ?? item.entry.date,
+                comment: canShowComment ? item.entry.comment : undefined,
+                privateComment: undefined,
+              },
+            };
+          }) }));
       } catch {}
     }
 

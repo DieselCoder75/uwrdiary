@@ -237,11 +237,16 @@ async function exportRunMaintenance(cfg, state, users, getBudget, spend) {
         cursor = snap.docs[snap.size - 1].data().date?.toMillis?.() ?? null;
       }
     }
-    await exportPost(cfg, {
-      treenit: rows,
-      verifyWindows: [{ start: win.start, end: win.end, keys }],
-    });
-    exportStatus(`Maintenance… ikkuna ${win.start}–${win.end} · ${rows.length} riviä`);
+    // TÄRKEÄ: verifyWindow poistaa Sheetistä rivit joita ei ole keys-listassa.
+    // Lähetä se VAIN jos ikkuna luettiin loppuun (budjettia jäi) — muuten
+    // vajaa keys-lista poistaisi oikeaa dataa. Vajaa ikkuna → vain upsert nyt,
+    // poistosovitus tehdään seuraavalla ajolla.
+    const complete = getBudget() > 0;
+    const payload = { treenit: rows };
+    if (complete) payload.verifyWindows = [{ start: win.start, end: win.end, keys }];
+    await exportPost(cfg, payload);
+    exportStatus(`Maintenance… ikkuna ${win.start}–${win.end} · ${rows.length} riviä` +
+      (complete ? '' : ' (kesken, ei poistotarkistusta)'));
   }
 
   // Etene kiertävää ikkunaa

@@ -78,6 +78,12 @@ function teamCacheKey(teams, weekStart) {
   return 'teamcmp_' + [...teams].sort().join('|') + '_' + weekStart;
 }
 
+// Vertailussa käytettävät joukkueet: impersonoinnissa katseltavan pelaajan, muuten omat.
+function vertailuTeams() {
+  if (impersonating) return impersonating.teams || [];
+  return userProfile.teams || (userProfile.team ? [userProfile.team] : []);
+}
+
 function teamCacheGet(uid, key) {
   try {
     const raw = localStorage.getItem('uppis_tc_' + uid + '_' + key);
@@ -146,11 +152,11 @@ function initVertailuPerfFilter() {
     // Keep Omat buttons in sync
     refreshPerfBtnStates('omat-perf-btns');
     // Clear team cache so filter change forces recompute
-    const myTeams = userProfile.teams || (userProfile.team ? [userProfile.team] : []);
+    const myTeams = vertailuTeams();
     if (myTeams.length > 0) {
       const weeks = getLastNWeeks(12);
       const cKey  = teamCacheKey(myTeams, weeks[0].getTime());
-      try { localStorage.removeItem('uppis_tc_' + currentUser.uid + '_' + cKey); } catch {}
+      try { localStorage.removeItem('uppis_tc_' + viewUid() + '_' + cKey); } catch {}
     }
     renderVertailuCharts();
   });
@@ -207,7 +213,7 @@ function renderVertailuKPIs(ownMinData, ownSessData, teamAvgMinData, teamTopMinD
 async function renderVertailuCharts() {
   if (!allChartEntries.length) await fetchChartEntries();
 
-  const myTeams = userProfile.teams || (userProfile.team ? [userProfile.team] : []);
+  const myTeams = vertailuTeams();
   const weeks   = getLastNWeeks(12);
   const wLabels = weeks.map(w => w.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' }));
 
@@ -241,7 +247,7 @@ async function renderVertailuCharts() {
   if (myTeams.length > 0) {
     try {
       const cKey     = teamCacheKey(myTeams, weeks[0].getTime());
-      const cacheHit = teamCacheGet(currentUser.uid, cKey); // always check, regardless of filter
+      const cacheHit = teamCacheGet(viewUid(), cKey); // always check, regardless of filter
 
       if (cacheHit?.memberEntries) {
         if (vertailuPerfFilter.length === 0) {
@@ -270,11 +276,11 @@ async function renderVertailuCharts() {
 
         const teamMemberUids = [];
         usersSnap.forEach(doc => {
-          if (doc.id !== currentUser.uid) teamMemberUids.push(doc.id);
+          if (doc.id !== viewUid()) teamMemberUids.push(doc.id);
         });
 
         // Seed with own entries (full 24-week set)
-        cachedTeamMemberEntries[currentUser.uid] = allChartEntries;
+        cachedTeamMemberEntries[viewUid()] = allChartEntries;
 
         // Fetch other members' entries in parallel
         if (teamMemberUids.length > 0) {
@@ -348,7 +354,7 @@ async function renderVertailuCharts() {
               type:        e.type        || '',
             }));
           });
-          teamCacheSet(currentUser.uid, cKey, {
+          teamCacheSet(viewUid(), cKey, {
             avgMins: teamAvgMinData,
             topMins: teamTopMinData,
             avgSess: teamAvgSessData,

@@ -39,33 +39,37 @@ service cloud.firestore {
         match /reactions/{reactorId} {
           allow read: if request.auth != null;
           allow write, delete: if request.auth != null && request.auth.uid == reactorId;
+          // Admin voi poistaa reaktioita (käyttäjän poiston yhteydessä)
+          allow delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
         }
       }
 
       match /fitTests/{testId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-        // Admin can read any user's fit tests (for impersonation view)
-        allow read: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+        // Admin can read any user's fit tests (for impersonation view) + delete (account removal)
+        allow read, delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
       }
 
       match /maxSpeedTests/{testId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-        // Admin can read any user's max speed tests (for impersonation view)
-        allow read: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+        // Admin can read any user's max speed tests (for impersonation view) + delete (account removal)
+        allow read, delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
       }
 
       match /muscleTests/{testId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
         // Any authenticated user can read (needed for team comparison)
         allow read: if request.auth != null;
+        // Admin can delete (account removal)
+        allow delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
       }
 
       // Poissaolot (sairas/loukkaantunut/…) — YKSITYISIÄ, eivät näy feedissä.
       match /absences/{absId} {
         // Omistaja: täysi luku/kirjoitus
         allow read, write: if request.auth != null && request.auth.uid == userId;
-        // Admin: lukee kenen tahansa (impersonointi)
-        allow read: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
+        // Admin: lukee kenen tahansa (impersonointi) + poistaa (tilin poisto)
+        allow read, delete: if request.auth != null && request.auth.token.email == 'janne.lind@gmail.com';
         // Valmentaja: lukee VAIN oman joukkueensa pelaajien poissaolot
         allow read: if request.auth != null
           && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.coachOf is list

@@ -477,9 +477,13 @@ async function deleteAllUserData(uid) {
     await batch.commit();
   }
 
-  // 3. Delete own entries in chunks of 499 (Firestore batch limit = 500)
+  // 3. Delete own entries + niiden reactions-alikokoelmat (dokumentin poisto EI
+  //    poista alikokoelmia → muuten jää orpoja reaction-dokumentteja).
   const entriesSnap = await userRef.collection('entries').get();
   const entryDocs   = entriesSnap.docs;
+  for (const entryDoc of entryDocs) {
+    await deleteSubcollectionDocs(entryDoc.ref.collection('reactions'));
+  }
   const CHUNK = 499;
   for (let i = 0; i < entryDocs.length; i += CHUNK) {
     const chunk = entryDocs.slice(i, i + CHUNK);
@@ -487,8 +491,33 @@ async function deleteAllUserData(uid) {
     chunk.forEach(d => b.delete(d.ref));
     await b.commit();
   }
-  // 4. Delete the user document itself
+
+  // 4. Poista henkilökohtaiset alikokoelmat (testit + poissaolot = terveystietoa).
+  //    Nämä eivät katoa käyttäjädokumentin poistolla.
+  for (const sub of ['fitTests', 'maxSpeedTests', 'muscleTests', 'absences']) {
+    await deleteSubcollectionDocs(userRef.collection(sub));
+  }
+
+  // 5. Delete the user document itself
   await userRef.delete();
+}
+
+// Poistaa alikokoelman kaikki dokumentit 499:n erissä (Firestore batch-raja 500).
+// Best-effort: jos säännöt eivät salli poistoa (esim. admin poistaa toisen pelaajan
+// alikokoelmaa ilman päivitettyjä sääntöjä), lokitetaan varoitus eikä keskeytetä
+// koko poistoa. Oman tilin poistossa (uid === currentUser.uid) säännöt sallivat kaiken.
+async function deleteSubcollectionDocs(collRef) {
+  try {
+    const snap = await collRef.get();
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 499) {
+      const b = db.batch();
+      docs.slice(i, i + 499).forEach(d => b.delete(d.ref));
+      await b.commit();
+    }
+  } catch (err) {
+    console.warn('deleteSubcollectionDocs epäonnistui (' + collRef.path + '):', err.message);
+  }
 }
 
 // ============================================================

@@ -96,6 +96,7 @@ function startImpersonation(uid, name, email) {
   // Reload entries for the viewed user
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
   allChartEntries = []; // pakota chart-datan uudelleenhaku impersonoidulle käyttäjälle
+  cachedTeamMemberEntries = {}; // ei vuoda adminin vertailudataa impersonoituun näkymään
   if (typeof resetAbsenceState === 'function') resetAbsenceState();
   loadEntries();
 }
@@ -120,6 +121,7 @@ function stopImpersonation() {
   // Lataa oma loki taustalla (ei blokkaa portaalin avautumista)
   if (unsubEntries) { unsubEntries(); unsubEntries = null; }
   allChartEntries = []; // pakota chart-datan paluu omaan käyttäjään
+  cachedTeamMemberEntries = {}; // ei vuoda impersonoidun pelaajan vertailudataa adminille
   if (typeof resetAbsenceState === 'function') resetAbsenceState();
   loadEntries();
 }
