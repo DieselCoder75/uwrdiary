@@ -77,6 +77,17 @@ function updateAdminShortcut() {
   el('aicoach-sub-tab-btn')?.classList.toggle('hidden', !aiCoachEnabledForCurrentUser());
   // Viikko-ohje -välilehti: näkyy kaikille
   el('viikkoohje-sub-tab-btn')?.classList.remove('hidden');
+  // Vertailu-välilehti: profiilin täpän mukaan (oletus näkyvissä). Vaikuttaa VAIN
+  // välilehden näkyvyyteen — ei siihen käytetäänkö omia treenejä muiden vertailussa.
+  const showVertailu = userProfile.showVertailu !== false;
+  const vBtn = el('vertailu-sub-tab-btn');
+  if (vBtn) {
+    vBtn.classList.toggle('hidden', !showVertailu);
+    // Jos piilotetaan ja se on juuri aktiivinen → siirry Omat-välilehteen
+    if (!showVertailu && vBtn.classList.contains('active')) {
+      document.querySelector('#trendit-sub-tabs [data-subtab="omat"]')?.click();
+    }
+  }
 }
 
 // Onko AI Coach käytössä nykyiselle käyttäjälle?
@@ -213,6 +224,7 @@ function openProfileModal() {
   el('profile-share-activities').checked = userProfile.shareActivities === true;
   el('profile-share-comments').checked   = userProfile.shareComments   === true;
   el('profile-aicoach-enabled').checked  = aiCoachEnabledForCurrentUser();
+  el('profile-show-vertailu').checked    = userProfile.showVertailu !== false;
   syncShareCommentsState();
   updateAgeDisplay(userProfile.birthday || '');
 
@@ -277,6 +289,7 @@ function openImpersonatedProfileView() {
   el('profile-aicoach-enabled').checked  = (typeof p.aiCoachEnabled === 'boolean')
     ? p.aiCoachEnabled
     : AICOACH_DEFAULT_ON_EMAILS.includes(impersonating?.email);
+  el('profile-show-vertailu').checked    = p.showVertailu !== false;
   updateAgeDisplay(p.birthday || '');
 
   // Avatar
@@ -359,6 +372,7 @@ el('profile-form').addEventListener('submit', async (e) => {
     shareActivities:  el('profile-share-activities').checked,
     shareComments:    el('profile-share-comments').checked,
     aiCoachEnabled:   el('profile-aicoach-enabled').checked,
+    showVertailu:     el('profile-show-vertailu').checked,
   };
 
   if (pendingAvatarDataUrl !== null) {

@@ -79,7 +79,7 @@
       <!-- Sub-tabs: osa sticky headeria, näkyy vain Trendit-välilehdellä -->
       <div class="sub-tabs hidden" id="trendit-sub-tabs">
         <button class="sub-tab active" data-subtab="omat">Omat</button>
-        <button class="sub-tab" data-subtab="vertailu">Vertailu</button>
+        <button class="sub-tab" data-subtab="vertailu" id="vertailu-sub-tab-btn">Vertailu</button>
         <button class="sub-tab" data-subtab="kuorma" id="kuorma-sub-tab-btn">Kuorma</button>
       </div>
       <!-- Sub-tabs: osa sticky headeria, näkyy vain Joukkue-välilehdellä -->
@@ -791,6 +791,14 @@
         </div>
 
         <div class="form-group">
+          <label>Näkymä</label>
+          <label class="team-checkbox-item">
+            <input type="checkbox" id="profile-show-vertailu">
+            <span>Näytä Vertailu-välilehti (Trendit)</span>
+          </label>
+        </div>
+
+        <div class="form-group">
           <label>AI Coach</label>
           <label class="team-checkbox-item">
             <input type="checkbox" id="profile-aicoach-enabled">
@@ -1447,7 +1455,7 @@
   <script src="js/entries.js?v=46"></script>
   <script src="js/absences.js?v=4"></script>
   <script src="js/charts.js?v=33"></script>
-  <script src="js/profile.js?v=71"></script>
+  <script src="js/profile.js?v=72"></script>
   <script src="js/joukkue.js?v=16"></script>
   <script src="js/calendar.js?v=49"></script>
   <script src="js/admin.js?v=66"></script>
