@@ -505,7 +505,7 @@ async function renderActivityReport(team, force = false) {
   const now    = firebase.firestore.Timestamp.fromDate(new Date());
 
   // ── Cache ──
-  const actCacheKey = `uppis_act_${currentUser.uid}_${team}_${weeks[0].getTime()}`;
+  const actCacheKey = `uppis_act2_${currentUser.uid}_${team}_${weeks[0].getTime()}`;
   if (!force) {
     try {
       const raw = localStorage.getItem(actCacheKey);
@@ -545,6 +545,8 @@ async function renderActivityReport(team, force = false) {
     const total4  = counts.slice(8).reduce((s, v) => s + v, 0);
 
     return {
+      uid:   u.uid,
+      email: u.email || '',
       name: [u.profile.firstName, u.profile.lastName].filter(Boolean).join(' ') || u.email || u.uid,
       counts,
       total4,
@@ -616,6 +618,7 @@ function renderActivityReportHtml(container, memberData, weeks) {
           <span class="act-pill">4 vk · <strong>${m.total4}</strong></span>
           <span class="act-pill">8 vk · <strong>${m.total8}</strong></span>
           <span class="act-pill">12 vk · <strong>${m.total12}</strong></span>
+          ${m.uid ? `<button class="btn-sm btn-view-sm act-open-loki" data-act="impersonate" data-uid="${escapeHtml(m.uid)}" data-name="${escapeHtml(m.name)}" data-email="${escapeHtml(m.email || '')}">Avaa loki</button>` : ''}
         </div>
       </div>`;
   };
@@ -765,6 +768,11 @@ async function renderCsvPlayerList(team) {
   // CSV-pelaajalista
   onClick('admin-csv-player-list', (act, btn) => {
     if (act === 'export-csv') adminExportPlayerCsv(btn.dataset.uid, btn.dataset.name, btn);
+  });
+
+  // Aktiivisuus-tiilet: "Avaa loki" → impersonointi (sama kuin käyttäjälistalla)
+  onClick('admin-activity-report', (act, btn) => {
+    if (act === 'impersonate') startImpersonation(btn.dataset.uid, btn.dataset.name, btn.dataset.email);
   });
 
   // Viikkosuunnitelma

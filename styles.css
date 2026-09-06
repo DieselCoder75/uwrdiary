@@ -2831,9 +2831,11 @@ main {
 /* Pillerit: 4/8/12 vk treenimäärät */
 .act-pills {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.6rem;
 }
+.act-open-loki { margin-left: auto; flex-shrink: 0; }
 .act-pill {
   font-size: 0.78rem;
   color: var(--blue-mid);
