@@ -11,7 +11,7 @@ const AICOACH_LS_PREFIX = 'uppis_aicoach_';          // + uid
 const AICOACH_TTL       = 7 * 24 * 60 * 60 * 1000;    // 1 vko
 // Nosta tätä aina kun promptia muutetaan → vanha välimuisti mitätöityy ja
 // analyysi ajetaan uusiksi uudella promptilla seuraavalla avauksella.
-const AICOACH_PROMPT_VERSION = 12;
+const AICOACH_PROMPT_VERSION = 13;
 const AICOACH_VOIMA_TYPES = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 
 const AICOACH_ZONE_DESC = [
@@ -162,7 +162,7 @@ function aiCoachBuildContext() {
 function aiCoachBuildPrompt() {
   const ctx = aiCoachBuildContext();
   const zoneDesc = AICOACH_ZONE_DESC.filter(Boolean).join('\n');
-  return `Olet uppopallon (underwater rugby) huippuvalmentaja. Analysoi pelaajan viimeisten viikkojen harjoitusdata ja anna kannustava mutta rehellinen valmennusanalyysi suomeksi. Saat sinutella ja puhua mutkattomasti, kuin valmentaja pelaajalleen – ei jäykkää virkakieltä. Ole aina lempeä ja rohkaiseva. Käytä selkeää, arkista suomea äläkä ammattislangia tai lyhenteitä: älä esimerkiksi käytä vastauksessa termiä "ACWR" tai muita akronyymejä, vaan puhu tavallisin sanoin ("kokonaisrasitus", "kuormitus", "palautuminen").
+  return `Olet uppopallon (underwater rugby) huippuvalmentaja. Analysoi pelaajan viimeisten viikkojen harjoitusdata ja anna kannustava mutta rehellinen valmennusanalyysi suomeksi. Saat sinutella ja puhua mutkattomasti, kuin valmentaja pelaajalleen – ei jäykkää virkakieltä. Ole aina lempeä ja rohkaiseva. Käytä selkeää, arkista suomea äläkä ammattislangia. Jos joudut viittaamaan mittariin (esim. ACWR, AU, CTL, ATL, EWMA), käytä ensin arkitermiä ja laita lyhenne sulkeisiin perään — esim. "kokonaisrasitus (ACWR)" — äläkä koskaan jätä pelkkää lyhennettä ilman selitystä. Puhu ensisijaisesti tavallisin sanoin ("kokonaisrasitus", "kuormitus", "palautuminen").
 
 PELAAJAN HARJOITUSDATA (vain muistissa oleva jakso, ${ctx.lines.length} viikkoa, vanhin ensin):
 ${ctx.lines.join('\n')}
@@ -191,7 +191,7 @@ POISSAOLOT:
   • Sairaus: sairaana EI tule treenata. Suosittele lepoa ja täyttä palautumista ennen paluuta harjoitteluun.
   • Loukkaantuminen / Rasitusvamma: harjoittelua voi yleensä jatkaa, mutta VÄLTÄ loukkaantuneen tai rasittuneen kehonosan kuormittamista. Ehdota vaihtoehtoisia harjoitteita, jotka eivät rasita kyseistä aluetta (esim. tekniikka, ylävartalo jos jalka kipeä, vesijuoksu jne.).
   • Uupumus / Ylikuormitus: suosittele treenikuorman keventämistä ja palautumisen priorisointia, kunnes vireys ja jaksaminen palaavat.
-- Pitkän sairaus- tai loukkaantumisjakson jälkeen nosta kuormaa MALTILLISESTI (ACWR voi piikata paluussa → loukkaantumisriski).${ctx.absentToday ? `\n- NYKYTILA: Pelaaja on juuri nyt merkitty poissaolevaksi (${ctx.currentAbsenceType}). Anna juuri tähän syyhyn sopiva ohje (yllä) ja priorisoi palautuminen — älä tyrkytä kovia treenejä.` : ''}
+- Pitkän sairaus- tai loukkaantumisjakson jälkeen nosta kuormaa MALTILLISESTI (kokonaisrasitus (ACWR) voi piikata paluussa → loukkaantumisriski).${ctx.absentToday ? `\n- NYKYTILA: Pelaaja on juuri nyt merkitty poissaolevaksi (${ctx.currentAbsenceType}). Anna juuri tähän syyhyn sopiva ohje (yllä) ja priorisoi palautuminen — älä tyrkytä kovia treenejä.` : ''}
 
 OHJEET ANALYYSIIN:
 - DATAN RIITTÄVYYS: ${ctx.weeksWithData < 2 ? 'Dataa on alle kahdelta viikolta — ÄLÄ arvioi treenimääriä, tehoaluejakaumaa tai trendejä. Kerro ystävällisesti ja kannustavasti, että dataa on toistaiseksi liian vähän luotettavaan analyysiin, ja rohkaise jatkamaan kirjaamista. Voit silti antaa yleisluontoisia, motivoivia vinkkejä.' : 'Dataa on vähintään kahdelta viikolta → perusarvio on perusteltu.'}
@@ -204,7 +204,7 @@ OHJEET ANALYYSIIN:
 - Katso osuvatko kovat tehoaluetreenit kalenterin suunniteltuun tehoalueeseen.
 - Tehoaluejakauma: JOKAISELLA viikolla vähintään noin 60 % kuormasta olisi hyvä olla kevyttä tai tasapainottavaa (tehoalueet I, II tai V — V on neuraalista, ei maitohapollista) tasapainottamassa kovia treenejä. KOVAN teeman viikoilla maitohapollisen kovan työn (tehoalueet III–IV) osuuden tulisi olla vähintään noin 20 %. Puutu jakaumaan vain jos se selvästi poikkeaa näistä.
 - Peräkkäiset kovat päivät: kova treenipäivä = päivä jolla on yksi tai useampi teho III tai IV -treeni. Muutama kova päivä putkeen EI ole virhe – se on täysin normaali ja hyödyllinen tapa rakentaa kuntoa ja totuttaa keho turnausten peräkkäisiin pelipäiviin, kunhan kovaa jaksoa seuraa kevyempiä päiviä tai vapaapäivä. Käytä TÄSMÄLLEEN yllä olevaa "PERÄKKÄISET KOVAT PÄIVÄT" -listaa; jos siinä lukee "ei havaittu", älä väitä muuta, äläkä koskaan päättele peräkkäisyyttä itse viikkodatan treenilistasta (siinä ei ole päivätason järjestystä). Kun näet 2–3 kovan päivän jakson jota seuraa kevennys, suhtaudu siihen MYÖNTEISESTI: kehu tarkoituksellista kovaa jaksoa ja muistuta lempeästi huolehtimaan palautumisesta perään. Mainitse palautuspäivän lisäämisestä VAIN jos kovaa työtä kertyy toistuvasti ilman palautumista (esim. monta kovaa päivää putkeen ilman yhtään kevyttä tai vapaata, tai sama kova rytmi jatkuu viikosta toiseen ilman kevennystä). Älä koskaan tulkitse yksittäistä kovaa jaksoa pelkkänä virheenä tai varoituksena.
-- Katso fiilis- ja kuormitustrendit. (Datassa on kuormituksen mittaluku, mutta ÄLÄ käytä vastauksessa lyhennettä "ACWR" tai muuta akronyymiä – kerro asia tavallisin sanoin, esim. "kokonaisrasituksesi on noussut aika reippaasti" tai "kuormasi on ollut pitkään melko kevyt".) Jos huono fiilis ja noussut kuormitus näyttävät kulkevan käsi kädessä, ehdota lempeästi keventämistä palauttavilla treeneillä. Jos kuormitus on noussut selvästi (mittaluku yli ~1,3) tai ollut pitkään hyvin matala, mainitse se ystävällisesti ja arkikielellä.
+- Katso fiilis- ja kuormitustrendit. (Datan viikkoriveillä oleva "ACWR"-luku kuvaa kokonaisrasitusta. Kerro se arkikielellä, esim. "kokonaisrasituksesi on noussut aika reippaasti" tai "kuormasi on ollut pitkään melko kevyt". Jos viittaat lukuun, käytä muotoa "kokonaisrasitus (ACWR)" – älä koskaan pelkkää lyhennettä.) Jos huono fiilis ja noussut kuormitus näyttävät kulkevan käsi kädessä, ehdota lempeästi keventämistä palauttavilla treeneillä. Jos kuormitus on noussut selvästi (yli ~1,3) tai ollut pitkään hyvin matala, mainitse se ystävällisesti ja arkikielellä.
 - Voit verrata toteutuneita treenejä pelaajan omiin viikkotavoitteisiin (yllä, jos asetettu).${ctx.upcomingEvents.length ? '\n- Huomioi tulevat maajoukkuetapahtumat (yllä): ehdota kevennystä (taper) juuri ennen leiriä/kisaa ja kovempaa työtä hyvissä ajoin sitä ennen.' : ''}${ctx.recentSessionCount < 3 && !ctx.absentToday && ctx.weeksWithData >= 2 ? `\n- HUOMIO: Viimeisen 7 päivän kirjauksissa on vain ${ctx.recentSessionCount} treeni${ctx.recentSessionCount === 1 ? '' : 'ä'}. Kannusta motivoivasti ja lempeästi nostamaan viikoittaista treenimäärää – muistuta, että säännöllisyys on kehittymisen perusta.` : ''}
 - Suosituksissa huomioi ensi viikon suunniteltu tehoalue (yllä): ehdota mille tehoalueelle kovat vedot kannattaa ajoittaa.
 - Älä tee terveys- tai lääketieteellisiä väittämiä; puhu harjoittelusta.
