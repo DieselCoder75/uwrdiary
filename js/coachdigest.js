@@ -13,7 +13,7 @@ const COACHDIGEST_TTL           = 12 * 60 * 60 * 1000;     // 12 h
 const COACHDIGEST_PROMPT_VERSION = 3;
 const COACHDIGEST_VOIMA_TYPES   = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 const COACHDIGEST_UINTI_TYPES   = ['Uinti', 'Avovesiuinti'];
-const COACHDIGEST_FETCH_LIMIT   = 80;   // per pelaaja (kattaa ~6 vk + marginaali)
+const COACHDIGEST_ANALYSIS_DAYS = 50;   // 6 ISO-viikkoa + puskuri (getLastNWeeks(6) -ikkuna)
 const COACHDIGEST_DEFAULT_TEAM  = 'Naisten Maajoukkue';
 
 // VAHVAT signaalisanat: näiden perusteella kommentti nostetaan aina esiin.
@@ -68,8 +68,11 @@ async function coachDigestFetchTeam(team) {
   });
   return Promise.all(members.map(async u => {
     const name = [u.profile.firstName, u.profile.lastName].filter(Boolean).join(' ') || u.email || u.uid;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - COACHDIGEST_ANALYSIS_DAYS);
     const snap = await db.collection('users').doc(u.uid).collection('entries')
-      .orderBy('date', 'desc').limit(COACHDIGEST_FETCH_LIMIT).get();
+      .where('date', '>=', cutoff)
+      .orderBy('date', 'desc').get();
     const entries = snap.docs.map(d => {
       const data = d.data();
       const dt = data.date?.toDate ? data.date.toDate() : new Date(data.date);
