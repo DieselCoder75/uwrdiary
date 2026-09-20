@@ -10,7 +10,7 @@
 
 const COACHDIGEST_LS_PREFIX     = 'uppis_cdigest_';        // + coachUid + '_' + team
 const COACHDIGEST_TTL           = 12 * 60 * 60 * 1000;     // 12 h
-const COACHDIGEST_PROMPT_VERSION = 2;
+const COACHDIGEST_PROMPT_VERSION = 3;
 const COACHDIGEST_VOIMA_TYPES   = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 const COACHDIGEST_UINTI_TYPES   = ['Uinti', 'Avovesiuinti'];
 const COACHDIGEST_FETCH_LIMIT   = 80;   // per pelaaja (kattaa ~6 vk + marginaali)
@@ -235,9 +235,11 @@ TREENIANALYYSIN TEESIT (tiiviisti, joukkuetasolla):
 - Sovellus on ollut käytössä vähän aikaa: tyhjät/vähäiset viikot johtuvat todennäköisesti kirjaamatta jättämisestä, EI treenaamattomuudesta. Kesken oleva viikko ei ole "kevyt". Älä moiti näistä.
 
 HENKISEN HYVINVOINNIN OHJE:
-- Fiilis (1–5) on tässä sovelluksessa pelaajan henkisen jaksamisen pääsignaali. Yhdistä se kommentteihin.
-- Nimeä VAIN pelaajat joilla on selkeä nosto: [HYVINVOINTISIGNAALI]-merkintä tai vahva kommentti. Yksittäinen heikko fiilis tai lievä negatiivinen maininta EI riitä nostoksi — ohita ne.
-- Yksi lause per nostettu pelaaja + tarvittaessa lyhyt sitaatti. Ei diagnooseja, ei dramatisointia.
+- Fiilis (1–5) on pelaajan henkisen jaksamisen pääsignaali. Yhdistä se kommentteihin.
+- Nimeä VAIN pelaajat joilla on selkeä nosto; yksittäinen heikko fiilis tai lievä maininta EI riitä.
+- Perustele jokainen nosto AINA konkreettisesti datasta: mikä laukaisi sen (esim. "fiilis laskenut 3.7→2.3", "kolme matalan fiiliksen treeniä", tai kommentin sisältö lyhyesti). ÄLÄ koskaan kirjoita "järjestelmä havaitsi signaalin" tai viittaa [HYVINVOINTISIGNAALI]-merkintään — se on vain sisäinen esisuodatin, ei syy jonka valmentaja näkee.
+- Erota kuormaväsymys tunnesignaalista: jos matala fiilis osuu suureen treenimäärään, se viittaa ennemmin palautumistarpeeseen; jos kommentit viittaavat stressiin tai elämäntilanteeseen, ehdota lyhyttä juttutuokiota.
+- Yksi tiivis lause per pelaaja (+ lyhyt sitaatti jos se valaisee). Tärkein ensin. Ei diagnooseja eikä dramatisointia.
 
 VASTAUKSEN MUOTO (markdown):
 ## Joukkueen kokonaiskuva
@@ -247,7 +249,7 @@ VASTAUKSEN MUOTO (markdown):
 3–5 luettelokohtaa ("- "). Nosta erityisesti esiin NIMELTÄ pelaajat, joiden treenaamisessa on hälyttävää (ks. TREENIHÄLYTYS-merkinnät): erittäin suuri treenimäärä (yli 10/vk), ei vapaapäiviä kahteen viikkoon, ei uintia/voimaa/uppopalloa yli kahteen viikkoon, tai kovalla viikolla ei tehty kovia treenejä. Mainitse myös lyhyesti joukkueen yleiskuva (määrät, uppopallo/oheis-suhde).
 
 ## Henkinen hyvinvointi
-Luettelo ("- ") vain niistä pelaajista joilla on nosto: nimi + yksi lause + tarvittaessa lyhyt sitaatti. Lopuksi yksi rivi: "Muilla ei erityisiä nostoja." jos niin on.
+Luettelo ("- ") vain niistä pelaajista joilla on nosto: nimi + konkreettinen syy yhdellä lauseella (+ lyhyt sitaatti tarvittaessa). ÄLÄ lisää loppuun koontilausetta muista pelaajista. Jos kenelläkään ei ole nostoa, kirjoita pelkkä rivi: "Ei erityisiä nostoja."
 Pidä vastaus tiiviinä. Älä toista raakadataa sellaisenaan.`;
 }
 
