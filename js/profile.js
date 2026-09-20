@@ -148,7 +148,7 @@ el('help-btn').addEventListener('click', () => {
   const build = vMatch ? vMatch[1] : '—';
   const updated = new Date(document.lastModified)
     .toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric', year: 'numeric' });
-  el('help-version-text').textContent  = `Versio 1.8 (build ${build})`;
+  el('help-version-text').textContent  = `Versio 1.9 (build ${build})`;
   el('help-updated-text').textContent  = `Päivitetty ${updated}`;
 
   // Nollaa aina Käyttöohje-välilehdelle

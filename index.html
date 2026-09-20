@@ -968,7 +968,7 @@
       <!-- Välilehti: Käyttöohje -->
       <div id="help-tab-kaytto" class="help-body">
       <div class="help-version-bar">
-        <span class="help-version" id="help-version-text">Versio 1.8</span>
+        <span class="help-version" id="help-version-text">Versio 1.9</span>
         <span class="help-updated" id="help-updated-text">Päivitetty…</span>
       </div>
 
@@ -1162,6 +1162,7 @@
           <p>Ylläpitäjälle ja valmentajille näkyy <strong>⚙-nappi</strong> yläpalkissa avatarin vieressä. Nappi avaa hallintapaneelin.</p>
           <p style="margin-top:0.5rem"><strong>Valmentajat</strong> näkevät hallintapaneelissa:</p>
           <ul>
+            <li><strong>Hyvinvointi</strong> — AI-valmentajan laatima koonti joukkueen hyvinvoinnista ja harjoittelusta viimeisten viikkojen ajalta. Nostaa esiin pelaajat, joiden fiilis tai kommentit kaipaavat huomiota, ja perustelee jokaisen noston lyhyesti. Tue keskustelua — ei diagnoosi. Naisten Maajoukkueen valmentajille sama koonti lähtee myös automaattisesti sähköpostilla <strong>maanantaisin klo 18</strong>.</li>
             <li><strong>Aktiivisuus</strong> — oman joukkueen harjoitusaktiivisuus 12 viikon ajalta pelaajittain</li>
             <li><strong>CSV</strong> — lataa koko joukkueen tai yksittäisen pelaajan harjoitusdata taulukkolaskentaan</li>
             <li><strong>In-personointi</strong> — käyttäjälistasta voi avata pelaajan näkymän (treenit, testit, saavutukset) ilman kirjautumistietojen vaihtoa. Yläpalkkiin ilmestyy pelaajan avatar ja <em>Lopeta</em>-nappi.</li>
@@ -1184,6 +1185,16 @@
       <div id="help-tab-versiot" class="help-body hidden">
         <section class="help-section help-history">
           <h3>📝 Versiohistoria</h3>
+
+          <div class="history-entry">
+            <span class="history-version">v1.9</span>
+            <span class="history-date">20.9.2026</span>
+            <ul>
+              <li><strong>Hyvinvointi-koonti valmentajille</strong> — hallintapaneelin uusi <em>Hyvinvointi</em>-välilehti: AI-valmentaja kokoaa joukkueen hyvinvoinnin ja harjoittelun tilan, nostaa esiin pelaajat joiden fiilis tai kommentit kaipaavat huomiota ja perustelee jokaisen noston konkreettisesti. Pelaajien nimet ovat klikattavia (avaa pelaajan näkymän).</li>
+              <li><strong>Viikoittainen hyvinvointisähköposti</strong> — Naisten Maajoukkueen valmentajat saavat saman koonnin automaattisesti sähköpostiin maanantaisin klo 18</li>
+              <li>Tietosuoja: koonti kokoaa myös yksityisiksi merkityt kommentit valmentajan tueksi — sähköpostissa tästä muistutus</li>
+            </ul>
+          </div>
 
           <div class="history-entry">
             <span class="history-version">v1.8</span>
@@ -1466,14 +1477,14 @@
   <script src="js/entries.js?v=46"></script>
   <script src="js/absences.js?v=4"></script>
   <script src="js/charts.js?v=33"></script>
-  <script src="js/profile.js?v=72"></script>
+  <script src="js/profile.js?v=73"></script>
   <script src="js/joukkue.js?v=16"></script>
   <script src="js/calendar.js?v=49"></script>
   <script src="js/admin.js?v=68"></script>
   <script src="js/export.js?v=2"></script>
   <script src="js/aicoach.js?v=20"></script>
   <script src="js/coachdigest.js?v=4"></script>
-  <script src="js/auth.js?v=25"></script>
+  <script src="js/auth.js?v=26"></script>
   <script src="js/app.js?v=20"></script>
 
   <!-- AI Coach: Firebase AI Logic (Gemini Developer API) — modulaarinen SDK -->

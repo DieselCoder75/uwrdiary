@@ -11,7 +11,7 @@
   const m = document.querySelector('link[href*="styles.css"]')
     ?.getAttribute('href')?.match(/v=(\d+)/);
   const build = m ? m[1] : '—';
-  v.textContent = `Versio 1.8 (build ${build})`;
+  v.textContent = `Versio 1.9 (build ${build})`;
 })();
 
 // ── Päivän tervehdys ──────────────────────────────────────────
