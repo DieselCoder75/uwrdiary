@@ -263,10 +263,13 @@ function coachDigestSetIntro() {
     + '<span class="aicoach-disclaimer">AI voi tehdä virheitä – käytä koontia keskustelun tukena, älä ainoana totuutena.</span>';
 }
 
-function coachDigestShow(text, ts) {
+function coachDigestShow(text, ts, players) {
   const out  = el('coachdigest-output');
   const meta = el('coachdigest-meta');
-  if (out) out.innerHTML = (typeof aiCoachFormat === 'function') ? aiCoachFormat(text) : escapeHtml(text);
+  if (out) {
+    out.innerHTML = (typeof aiCoachFormat === 'function') ? aiCoachFormat(text) : escapeHtml(text);
+    coachDigestLinkifyNames(out, players);
+  }
   if (meta && ts) {
     const d = new Date(ts);
     meta.textContent = `Koonti tehty ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()} klo `
@@ -274,23 +277,57 @@ function coachDigestShow(text, ts) {
   }
 }
 
-// Pelaajanapit rakennetaan OMASTA rakenteisesta datasta (ei AI-tekstistä) → XSS-turvallinen.
-function coachDigestRenderPlayers(players) {
-  const box = el('coachdigest-players');
-  if (!box) return;
-  const withData = (players || []).filter(p => p.hasData);
-  if (!withData.length) { box.innerHTML = ''; return; }
-  const sorted = [...withData].sort((a, b) =>
-    (b.wellbeingFlag - a.wellbeingFlag) || a.name.localeCompare(b.name, 'fi'));
-  box.innerHTML = `<h4 class="coachdigest-players-title">Pelaajat</h4>`
-    + sorted.map(p => {
-      const dot = p.wellbeingFlag ? '<span class="coachdigest-dot" title="Signaali fiiliksessä"></span>' : '';
-      return `<div class="coachdigest-player-row">
-          <span class="coachdigest-player-name">${dot}${escapeHtml(p.name)}</span>
-          <button class="btn-secondary coachdigest-open-btn" data-act="impersonate"
-            data-uid="${escapeHtml(p.uid)}" data-name="${escapeHtml(p.name)}" data-email="${escapeHtml(p.email)}">Avaa loki</button>
-        </div>`;
-    }).join('');
+// Tekee AI-tekstissä esiintyvistä pelaajien nimistä klikattavia (→ impersonointi).
+// Nimet ja UID:t tulevat OMASTA rakenteisesta datasta (ei AI-tekstistä) → XSS-turvallinen:
+// AI-teksti vain haetaan, korvattava sisältö rakennetaan textContentina + dataset-attribuutteina.
+function coachDigestLinkifyNames(container, players) {
+  const named = (players || []).filter(p => p && p.name && p.uid);
+  if (!container || !named.length) return;
+
+  // Nimikartta: koko nimi + uniikki etunimi (jos ei toistu joukkueessa).
+  const byName = new Map();
+  named.forEach(p => byName.set(p.name, p));
+  const firstCounts = {};
+  named.forEach(p => { const f = p.name.split(' ')[0]; firstCounts[f] = (firstCounts[f] || 0) + 1; });
+  named.forEach(p => {
+    const f = p.name.split(' ')[0];
+    if (firstCounts[f] === 1 && !byName.has(f)) byName.set(f, p);
+  });
+
+  // Pisin ensin → "Anna Korhonen" ennen "Anna"
+  const keys = [...byName.keys()].sort((a, b) => b.length - a.length);
+  const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(' + keys.map(escapeRe).join('|') + ')', 'g');
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const targets = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    re.lastIndex = 0;
+    if (re.test(node.nodeValue)) targets.push(node);
+  }
+
+  targets.forEach(tn => {
+    const s = tn.nodeValue;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    re.lastIndex = 0;
+    while ((m = re.exec(s))) {
+      const p = byName.get(m[0]);
+      if (m.index > last) frag.appendChild(document.createTextNode(s.slice(last, m.index)));
+      const span = document.createElement('span');
+      span.className = 'coachdigest-name-link';
+      span.dataset.act   = 'impersonate';
+      span.dataset.uid   = p.uid;
+      span.dataset.name  = p.name;
+      span.dataset.email = p.email || '';
+      span.textContent   = m[0];
+      frag.appendChild(span);
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+    tn.parentNode.replaceChild(frag, tn);
+  });
 }
 
 async function coachDigestRun() {
@@ -303,7 +340,6 @@ async function coachDigestRun() {
   coachDigestBusy = true;
   if (btn) { btn.disabled = true; btn.textContent = 'Analysoidaan…'; }
   if (out) out.innerHTML = '<p class="loading">Kootaan joukkueen tilannetta…</p>';
-  el('coachdigest-players') && (el('coachdigest-players').innerHTML = '');
 
   try {
     if (typeof window.geminiGenerate !== 'function') throw new Error('AI-moduuli ei latautunut');
@@ -322,8 +358,7 @@ async function coachDigestRun() {
     const ts   = Date.now();
     const slim = analyzed.map(p => ({ uid: p.uid, name: p.name, email: p.email, hasData: p.hasData, wellbeingFlag: !!p.wellbeingFlag }));
     coachDigestSetCached(team, text, slim, ts);
-    coachDigestShow(text, ts);
-    coachDigestRenderPlayers(analyzed);
+    coachDigestShow(text, ts, analyzed);
   } catch (err) {
     console.error('Hyvinvointi-koonti:', err);
     if (out) out.innerHTML = `<p class="aicoach-error">Koonti epäonnistui: ${escapeHtml(err?.message || String(err))}`
@@ -344,8 +379,7 @@ async function renderCoachDigestTab() {
 
   const cached = coachDigestGetCached(team);
   if (cached) {
-    coachDigestShow(cached.text, cached.ts);
-    coachDigestRenderPlayers(cached.players || []);
+    coachDigestShow(cached.text, cached.ts, cached.players || []);
   }
   const stale = !cached
     || (Date.now() - cached.ts > COACHDIGEST_TTL)
@@ -357,8 +391,8 @@ async function renderCoachDigestTab() {
 el('coachdigest-team')?.addEventListener('change', () => renderCoachDigestTab());
 el('coachdigest-run-btn')?.addEventListener('click', () => coachDigestRun());
 
-// Pelaajanappien delegation (pysyvä container) → impersonointi
-el('coachdigest-players')?.addEventListener('click', e => {
-  const btn = e.target.closest('[data-act="impersonate"]');
-  if (btn) startImpersonation(btn.dataset.uid, btn.dataset.name, btn.dataset.email);
+// Tekstin nimilinkkien delegation (pysyvä container) → impersonointi
+el('coachdigest-output')?.addEventListener('click', e => {
+  const t = e.target.closest('[data-act="impersonate"]');
+  if (t) startImpersonation(t.dataset.uid, t.dataset.name, t.dataset.email);
 });

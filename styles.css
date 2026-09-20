@@ -807,39 +807,13 @@ header h1 {
 }
 #coachdigest-output ul { margin: 4px 0 8px; padding-left: 1.1rem; }
 #coachdigest-output li { margin-bottom: 3px; }
-.coachdigest-players { margin-top: 16px; }
-.coachdigest-players-title {
-  font-size: 0.9rem;
-  color: var(--blue-mid);
-  margin: 0 0 6px;
-}
-.coachdigest-player-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border-light);
-}
-.coachdigest-player-name {
-  font-size: 0.85rem;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.coachdigest-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--red);
-  flex: 0 0 auto;
-}
-.coachdigest-open-btn {
-  flex: 0 0 auto;
-  width: auto;
-  margin: 0;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.78rem;
+.coachdigest-name-link {
+  color: var(--blue);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
 }
 .aicoach-meta {
   font-size: 0.72rem;
