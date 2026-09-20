@@ -10,18 +10,22 @@
 
 const COACHDIGEST_LS_PREFIX     = 'uppis_cdigest_';        // + coachUid + '_' + team
 const COACHDIGEST_TTL           = 12 * 60 * 60 * 1000;     // 12 h
-const COACHDIGEST_PROMPT_VERSION = 1;
+const COACHDIGEST_PROMPT_VERSION = 2;
 const COACHDIGEST_VOIMA_TYPES   = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 const COACHDIGEST_UINTI_TYPES   = ['Uinti', 'Avovesiuinti'];
 const COACHDIGEST_FETCH_LIMIT   = 80;   // per pelaaja (kattaa ~6 vk + marginaali)
 const COACHDIGEST_DEFAULT_TEAM  = 'Naisten Maajoukkue';
 
-// Kommenteista poimittavat "signaalisanat" (henkinen kuormitus / jaksaminen)
-const COACHDIGEST_MOOD_WORDS = [
-  'väsy', 'uupu', 'näänty', 'poikki', 'loppu', 'jaksa', 'jaksami', 'univaj', 'nuku huono',
-  'stress', 'paine', 'kiire', 'ahdist', 'masent', 'alaku', 'motivaati', 'turhaut', 'kyllästy',
-  'kipu', 'kipeä', 'sairas', 'flunssa', 'kuume', 'vamma', 'loukkaan', 'rasitus', 'kramppi',
+// VAHVAT signaalisanat: näiden perusteella kommentti nostetaan aina esiin.
+// Lievät negatiiviset maininnat ("vähän väsytti") ohitetaan tarkoituksella.
+const COACHDIGEST_STRONG_WORDS = [
+  'uupu', 'näänty', 'loppuun', 'burn', 'en jaksa', 'ei jaksa enää', 'täysin poikki',
+  'masent', 'ahdist', 'paniikki', 'itku', 'itketti', 'romah', 'ylikuormit',
+  'vamma', 'loukkaan', 'loukkasi', 'murtu', 'reväh', 'repesi', 'leikkaus',
+  'sairas', 'kuume', 'kova kipu', 'kovaa kipua', 'en pysty', 'lopettaa',
 ];
+const COACHDIGEST_ACTIVE_DAYS = 14;   // aktiiviseksi vaaditaan kirjaus viim. 2 vk
+const COACHDIGEST_HIGH_WEEK   = 10;   // yli tämän treeniä/vk = hälytys
 
 // ── Joukkuevalitsin ───────────────────────────────────────────
 function populateCoachDigestTeams(teamsForSelects) {
@@ -78,7 +82,10 @@ async function coachDigestFetchTeam(team) {
 // ── Per pelaaja: 6 vk ikkuna + 3v3 fiilisvertailu + kommentit ─
 function coachDigestAnalyzePlayer(p) {
   const es = p.entries;
-  if (!es.length) return { uid: p.uid, name: p.name, email: p.email, hasData: false };
+  if (!es.length) return { uid: p.uid, name: p.name, email: p.email, hasData: false, active: false };
+
+  const now = new Date(); now.setHours(23, 59, 59, 999);
+  const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - COACHDIGEST_ACTIVE_DAYS);
 
   const maxDate  = es.reduce((m, e) => e._d > m ? e._d : m, new Date(0));
   const winStart = new Date(maxDate); winStart.setDate(winStart.getDate() - 42);
@@ -87,6 +94,11 @@ function coachDigestAnalyzePlayer(p) {
   const win    = es.filter(e => e._d > winStart && e._d <= maxDate);
   const recent = win.filter(e => e._d > midStart);       // viim. 3 vk
   const prior  = win.filter(e => e._d <= midStart);      // edell. 3 vk
+  const last14 = es.filter(e => e._d >= twoWeeksAgo && e._d <= now);
+
+  // Aktiivinen = vähintään yksi kirjaus viimeisen 2 viikon aikana. Ei-aktiivisia
+  // ei analysoida lainkaan (ei hyvinvointi- eikä treenihälytyksiä).
+  const active = last14.length > 0;
 
   const feelAvg = arr => {
     const f = arr.map(e => e.feeling).filter(x => x >= 1);
@@ -102,11 +114,14 @@ function coachDigestAnalyzePlayer(p) {
   const voima = win.filter(e => COACHDIGEST_VOIMA_TYPES.includes(e.type)).length;
   const oheis = win.length - uppo;
 
-  // Kommentit (myös yksityiset) — poimi vain signaaliset: matala fiilis TAI signaalisana
+  // Kommentit: nosta esiin VAIN vahvat signaalit (vahva sana tai fiilis = 1).
+  // Yksittäinen heikko fiilis (2) tai lievä negatiivinen maininta ohitetaan.
+  const hasStrongComment = win.some(e =>
+    (e.comment || '') && COACHDIGEST_STRONG_WORDS.some(w => e.comment.toLowerCase().includes(w)));
   const comments = win
     .filter(e => (e.comment || '').trim())
-    .filter(e => (e.feeling >= 1 && e.feeling <= 2) ||
-      COACHDIGEST_MOOD_WORDS.some(w => e.comment.toLowerCase().includes(w)))
+    .filter(e => e.feeling === 1 ||
+      COACHDIGEST_STRONG_WORDS.some(w => e.comment.toLowerCase().includes(w)))
     .sort((a, b) => b._d - a._d)
     .slice(0, 3)
     .map(e => ({
@@ -115,13 +130,46 @@ function coachDigestAnalyzePlayer(p) {
       text: e.comment.trim().slice(0, 180),
     }));
 
-  const wellbeingFlag = (feelDelta != null && feelDelta <= -1.0) || lowRecent >= 3;
+  // ── Treenihälytykset (deterministiset) — vain aktiivisille ──
+  const trainingFlags = [];
+  if (active) {
+    // 1. Yli 10 treeniä jonakin viikkona
+    const perWeek = {};
+    win.forEach(e => { const k = calWeekKey(e._d); perWeek[k] = (perWeek[k] || 0) + 1; });
+    const maxWeek = Math.max(0, ...Object.values(perWeek));
+    if (maxWeek > COACHDIGEST_HIGH_WEEK) trainingFlags.push(`erittäin suuri treenimäärä (${maxWeek} yhtenä viikkona)`);
+
+    // 2. Ei vapaapäiviä kahteen viikkoon (kirjaus jokaisena viim. 14 pv)
+    const dayKeys = new Set(last14.map(e => calDateKey(e._d)));
+    if (dayKeys.size >= COACHDIGEST_ACTIVE_DAYS) trainingFlags.push('ei yhtään vapaapäivää kahteen viikkoon');
+
+    // 3. Puuttuva laji yli kahteen viikkoon
+    if (!last14.some(e => e.type === 'Uppopallo'))                       trainingFlags.push('ei uppopalloa yli 2 vk');
+    if (!last14.some(e => COACHDIGEST_UINTI_TYPES.includes(e.type)))     trainingFlags.push('ei uintia yli 2 vk');
+    if (!last14.some(e => COACHDIGEST_VOIMA_TYPES.includes(e.type)))     trainingFlags.push('ei voimaharjoittelua yli 2 vk');
+
+    // 4. Kovalla viikolla ei kovia treenejä (suunniteltu III/IV, mutta ei III/IV-treeniä)
+    getLastNWeeks(6).forEach(wStart => {
+      const planned = calPlannedZone(wStart) || '';
+      if (!/III|IV/.test(planned)) return;
+      const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 7);
+      const wkEntries = win.filter(e => e._d >= wStart && e._d < wEnd);
+      if (!wkEntries.length) return;                       // ei treenannut → ei tämä hälytys
+      if (!wkEntries.some(e => e.performance === 3 || e.performance === 4)) {
+        const { week } = calIsoWeekData(wStart);
+        trainingFlags.push(`vk ${week} oli kova (${planned}), mutta ei kovia (III/IV) treenejä`);
+      }
+    });
+  }
+
+  const wellbeingFlag = active &&
+    ((feelDelta != null && feelDelta <= -1.0) || lowRecent >= 3 || hasStrongComment);
 
   return {
-    uid: p.uid, name: p.name, email: p.email, hasData: true,
+    uid: p.uid, name: p.name, email: p.email, hasData: true, active,
     sessions: win.length, uppo, oheis, uinti, voima,
-    recentFeel, priorFeel, feelDelta, lowRecent, comments, wellbeingFlag,
-    maxDate,
+    recentFeel, priorFeel, feelDelta, lowRecent, comments, hasStrongComment,
+    trainingFlags, wellbeingFlag, maxDate,
   };
 }
 
@@ -149,31 +197,36 @@ function coachDigestTeamWeeks(players) {
 
 // ── Promptin rakennus ─────────────────────────────────────────
 function coachDigestBuildPrompt(team, analyzed, weekLines) {
-  const withData = analyzed.filter(p => p.hasData);
-  const playerLines = withData.map(p => {
+  const activePlayers = analyzed.filter(p => p.hasData && p.active);
+  const inactive      = analyzed.filter(p => p.hasData && !p.active).map(p => p.name);
+  const noData        = analyzed.filter(p => !p.hasData).map(p => p.name);
+
+  const playerLines = activePlayers.map(p => {
     const feel = p.recentFeel != null
       ? `fiilis viim.3vk ${p.recentFeel}/5 vs edell.3vk ${p.priorFeel != null ? p.priorFeel + '/5' : '–'}${p.feelDelta != null ? ` (muutos ${p.feelDelta > 0 ? '+' : ''}${p.feelDelta})` : ''}`
       : 'fiilis –';
-    const low = p.lowRecent > 0 ? `; ${p.lowRecent} matalan fiiliksen (1–2) treeniä viim.3vk` : '';
-    const flag = p.wellbeingFlag ? ' [SIGNAALI]' : '';
-    let line = `- ${p.name}${flag}: 6vk yhteensä ${p.sessions} treeniä (uppopallo ${p.uppo}, oheis ${p.oheis}, uinti ${p.uinti}, voima ${p.voima}); ${feel}${low}.`;
+    const low  = p.lowRecent > 0 ? `; ${p.lowRecent} matalan fiiliksen (1–2) treeniä viim.3vk` : '';
+    const wflag = p.wellbeingFlag ? ' [HYVINVOINTISIGNAALI]' : '';
+    let line = `- ${p.name}${wflag}: 6vk yhteensä ${p.sessions} treeniä (uppopallo ${p.uppo}, oheis ${p.oheis}, uinti ${p.uinti}, voima ${p.voima}); ${feel}${low}.`;
+    if (p.trainingFlags.length) line += ` TREENIHÄLYTYS: ${p.trainingFlags.join('; ')}.`;
     if (p.comments.length) {
-      line += ' Kommentit: ' + p.comments.map(c =>
+      line += ' Vahvat kommentit: ' + p.comments.map(c =>
         `"${c.text}"${c.feeling ? ` (fiilis ${c.feeling})` : ''}`).join(' ');
     }
     return line;
   });
-  const noData = analyzed.filter(p => !p.hasData).map(p => p.name);
 
   return `Olet uppopallon (underwater rugby) huippuvalmentaja. Laadit joukkueen valmentajalle TIIVIIN hyvinvointi- ja harjoittelukoonnin suomeksi. Pidä koko vastaus korkeintaan noin kahden ruudun/sivun mittaisena. Ole lempeä, konkreettinen ja ammattimainen. Käytä selkeää, arkista suomea äläkä ammattislangia. Jos joudut viittaamaan mittariin (esim. kokonaisrasitus/ACWR), käytä arkitermiä ja laita lyhenne tarvittaessa sulkeisiin. ÄLÄ tee terveys- tai lääketieteellisiä diagnooseja — kuvaile vain havaintoja fiiliksestä ja kommenteista ja ehdota, että valmentaja voi jutella pelaajan kanssa.
 
-JOUKKUE: ${team} (${analyzed.length} pelaajaa, joista ${withData.length} kirjannut treenejä)
+ÄLÄ aloita tervehdyksellä, alustuksella tai johdannolla. Aloita vastaus SUORAAN otsikolla "## Joukkueen kokonaiskuva".
+
+JOUKKUE: ${team} (analysoidaan ${activePlayers.length} aktiivista pelaajaa, jotka ovat kirjanneet treenin viim. 2 vk aikana)
 
 JOUKKUEEN VIIKKOTASO (viimeiset 6 viikkoa, suunniteltu tehoalue mukana):
 ${weekLines.join('\n')}
 
-PELAAJAKOHTAINEN DATA (kunkin pelaajan 6 viikkoa hänen viimeisimmästä kirjauksestaan taaksepäin; fiilisvertailu = viim. 3 vk vs edell. 3 vk. "[SIGNAALI]" = automaattinen esisuodatin havaitsi fiiliksen laskun ≥1.0 tai ≥3 matalan fiiliksen treeniä):
-${playerLines.join('\n')}${noData.length ? `\n\nEI KIRJAUKSIA (älä arvioi näitä): ${noData.join(', ')}` : ''}
+PELAAJAKOHTAINEN DATA (vain aktiiviset; kunkin 6 viikkoa hänen viimeisimmästä kirjauksestaan taaksepäin; fiilisvertailu = viim. 3 vk vs edell. 3 vk. "[HYVINVOINTISIGNAALI]" = esisuodatin havaitsi fiiliksen laskun ≥1.0, ≥3 matalan fiiliksen treeniä TAI vahvan kommentin):
+${playerLines.join('\n')}${inactive.length ? `\n\nEI KIRJAUKSIA VIIM. 2 VK (ÄLÄ analysoi äläkä nimeä näitä): ${inactive.join(', ')}` : ''}${noData.length ? `\nEI KIRJAUKSIA LAINKAAN (ohita): ${noData.join(', ')}` : ''}
 
 TREENIANALYYSIN TEESIT (tiiviisti, joukkuetasolla):
 - Hyvään viikkoon kuuluu sekä uppopalloa että monipuolista oheista (uinti + voima). Suuntaa-antava: 4 harj/vko → 2+2, 5 → 2+3, 6 → 3+3, 7 → 3+4.
@@ -183,15 +236,15 @@ TREENIANALYYSIN TEESIT (tiiviisti, joukkuetasolla):
 
 HENKISEN HYVINVOINNIN OHJE:
 - Fiilis (1–5) on tässä sovelluksessa pelaajan henkisen jaksamisen pääsignaali. Yhdistä se kommentteihin.
-- Nimeä VAIN pelaajat joilla on selkeä nosto (lasku fiiliksessä, toistuva matala fiilis, tai kommentti joka viittaa väsymykseen/stressiin/kipuun). Muista pelaajista riittää maininta "ei erityisiä nostoja".
-- Yksi lause per pelaaja + tarvittaessa lyhyt sitaatti kommentista. Ei diagnooseja, ei dramatisointia.
+- Nimeä VAIN pelaajat joilla on selkeä nosto: [HYVINVOINTISIGNAALI]-merkintä tai vahva kommentti. Yksittäinen heikko fiilis tai lievä negatiivinen maininta EI riitä nostoksi — ohita ne.
+- Yksi lause per nostettu pelaaja + tarvittaessa lyhyt sitaatti. Ei diagnooseja, ei dramatisointia.
 
 VASTAUKSEN MUOTO (markdown):
 ## Joukkueen kokonaiskuva
-2–4 lausetta joukkueen tilanteesta (treeni + henkinen puoli).
+2–4 lausetta joukkueen tilanteesta (treeni + henkinen puoli). ÄLÄ kirjoita mitään tämän otsikon eteen.
 
 ## Harjoittelu
-3–5 luettelokohtaa ("- ") joukkuetason havainnoista (määrät, uppopallo/oheis-suhde, tehoaluejakauma, osuvuus suunnitelmaan). Nimeä pelaaja vain jos hän selkeästi poikkeaa.
+3–5 luettelokohtaa ("- "). Nosta erityisesti esiin NIMELTÄ pelaajat, joiden treenaamisessa on hälyttävää (ks. TREENIHÄLYTYS-merkinnät): erittäin suuri treenimäärä (yli 10/vk), ei vapaapäiviä kahteen viikkoon, ei uintia/voimaa/uppopalloa yli kahteen viikkoon, tai kovalla viikolla ei tehty kovia treenejä. Mainitse myös lyhyesti joukkueen yleiskuva (määrät, uppopallo/oheis-suhde).
 
 ## Henkinen hyvinvointi
 Luettelo ("- ") vain niistä pelaajista joilla on nosto: nimi + yksi lause + tarvittaessa lyhyt sitaatti. Lopuksi yksi rivi: "Muilla ei erityisiä nostoja." jos niin on.
