@@ -1,0 +1,40 @@
+name: Viikoittainen Hyvinvointi-koonti
+
+on:
+  schedule:
+    # GitHub cron on UTC. Ma 07:00 Suomen aikaa = 05:00 UTC (talvi, UTC+2) tai
+    # 04:00 UTC (kesä, UTC+3). Molemmat ajetaan; skripti päästää läpi vain kun
+    # Suomen aika on 07 (DST-portti weekly-digest.mjs:ssä).
+    - cron: '0 4 * * 1'
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Aja heti kellonajasta riippumatta (ohita DST-portti)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: weekly-digest
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        working-directory: cron
+        run: npm ci || npm install
+      - name: Send weekly digest
+        working-directory: cron
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          FORCE_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.force) && '1' || '' }}
+        run: node weekly-digest.mjs

@@ -1,0 +1,14 @@
+{
+  "name": "uwr-weekly-digest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Viikoittainen Hyvinvointi-koonti sähköpostilla (GitHub Actions cron)",
+  "scripts": {
+    "start": "node weekly-digest.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "nodemailer": "^6.9.16"
+  }
+}

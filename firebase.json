@@ -11,6 +11,8 @@
       "serve.py",
       "mockup-*.html",
       "tools/**",
+      "cron/**",
+      ".github/**",
       "**/.*",
       "**/node_modules/**"
     ],
