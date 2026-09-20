@@ -332,17 +332,17 @@ async function fetchEntries(db, uid) {
 }
 
 // ── Pääajo ────────────────────────────────────────────────────
-function isHelsinki7() {
+function isHelsinki18() {
   const h = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Helsinki', hour: '2-digit', hourCycle: 'h23',
   }).format(new Date());
-  return Number(h) === 7;
+  return Number(h) === 18;
 }
 
 async function main() {
   const force = process.env.FORCE_RUN === '1';
-  if (!force && !isHelsinki7()) {
-    console.log('Ei klo 07 Suomen aikaa — ohitetaan tämä ajo (DST-portti).');
+  if (!force && !isHelsinki18()) {
+    console.log('Ei klo 18 Suomen aikaa — ohitetaan tämä ajo (DST-portti).');
     return;
   }
 
