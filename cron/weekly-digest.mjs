@@ -18,7 +18,7 @@ const APP_URL = 'https://uwrdiary.web.app';
 // ── Vakiot (mirror js/coachdigest.js) ─────────────────────────
 const VOIMA_TYPES = ['Voimaharjoittelu', 'Kuntosali', 'Kahvakuula', 'Kuntopiiri'];
 const UINTI_TYPES = ['Uinti', 'Avovesiuinti'];
-const FETCH_LIMIT = 80;
+const ANALYSIS_DAYS = 50;  // 6 ISO-viikkoa + puskuri (getLastNWeeks(6) -ikkuna)
 const ACTIVE_DAYS = 14;
 const HIGH_WEEK   = 10;
 const STRONG_WORDS = [
@@ -322,8 +322,11 @@ async function loadUsers(db) {
   });
 }
 async function fetchEntries(db, uid) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - ANALYSIS_DAYS);
   const snap = await db.collection('users').doc(uid).collection('entries')
-    .orderBy('date', 'desc').limit(FETCH_LIMIT).get();
+    .where('date', '>=', cutoff)
+    .orderBy('date', 'desc').get();
   return snap.docs.map(d => {
     const data = d.data();
     const dt = data.date?.toDate ? data.date.toDate() : new Date(data.date);
