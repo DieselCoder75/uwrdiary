@@ -771,6 +771,76 @@ header h1 {
   line-height: 1.45;
   margin: 6px 0 0;
 }
+
+/* ── Hyvinvointi-koonti (Feature A) ── */
+.coachdigest-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.coachdigest-header .admin-select { flex: 1; }
+.coachdigest-header .coachdigest-run-btn {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+}
+.coachdigest-intro {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 8px 0 0;
+}
+#coachdigest-output {
+  margin-top: 12px;
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+#coachdigest-output h2,
+#coachdigest-output h3,
+#coachdigest-output h4 {
+  color: var(--blue-mid);
+  margin: 14px 0 4px;
+  font-size: 0.95rem;
+}
+#coachdigest-output ul { margin: 4px 0 8px; padding-left: 1.1rem; }
+#coachdigest-output li { margin-bottom: 3px; }
+.coachdigest-players { margin-top: 16px; }
+.coachdigest-players-title {
+  font-size: 0.9rem;
+  color: var(--blue-mid);
+  margin: 0 0 6px;
+}
+.coachdigest-player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.coachdigest-player-name {
+  font-size: 0.85rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.coachdigest-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  flex: 0 0 auto;
+}
+.coachdigest-open-btn {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+}
 .aicoach-meta {
   font-size: 0.72rem;
   color: var(--text-muted);

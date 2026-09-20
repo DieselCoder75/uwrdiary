@@ -160,7 +160,7 @@ async function openAdminPortal() {
   if (firstVisible) {
     document.querySelectorAll('[data-admin-tab]').forEach(b => b.classList.remove('active'));
     firstVisible.classList.add('active');
-    ['aktiivisuus', 'kayttajat', 'csv', 'yllapito'].forEach(t =>
+    ['aktiivisuus', 'hyvinvointi', 'kayttajat', 'yllapito'].forEach(t =>
       el('admin-tab-' + t)?.classList.toggle('hidden', t !== firstVisible.dataset.adminTab)
     );
   }
@@ -170,6 +170,7 @@ async function openAdminPortal() {
   populateAdminTeamSelect();
   populateAdminPortalSelects(teamsForSelects, isAdmin);
   populateActivitySelect();
+  if (typeof populateCoachDigestTeams === 'function') populateCoachDigestTeams(teamsForSelects);
   if (isAdmin) { renderAdminTeamsList(); renderWeekPlanSection(); }
 
   show('admin-portal');
@@ -179,14 +180,8 @@ async function openAdminPortal() {
     loadAdminUserListPortal();
     renderActivityReport('__all__'); // Aktiivisuus latautuu automaattisesti (ei joukkuevalintaa)
   } else if (isCoach) {
-    // Auto-load first coach team in activity report
+    // Auto-load first coach team in activity report (CSV siirtyi Ylläpitoon = admin-only)
     if (coachTeams[0]) renderActivityReport(coachTeams[0]);
-    // Populate CSV player list for first team
-    const csvSel = el('admin-csv-team-portal');
-    if (csvSel && coachTeams[0]) {
-      csvSel.value = coachTeams[0];
-      renderCsvPlayerList(coachTeams[0]);
-    }
   }
 }
 
@@ -237,10 +232,11 @@ document.querySelectorAll('[data-admin-tab]').forEach(btn => {
     document.querySelectorAll('[data-admin-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.adminTab;
-    ['aktiivisuus', 'kayttajat', 'csv', 'yllapito'].forEach(t => {
+    ['aktiivisuus', 'hyvinvointi', 'kayttajat', 'yllapito'].forEach(t => {
       el('admin-tab-' + t).classList.toggle('hidden', t !== tab);
     });
     if (tab === 'kayttajat') loadAdminUserListPortal();
+    if (tab === 'hyvinvointi' && typeof renderCoachDigestTab === 'function') renderCoachDigestTab();
     if (tab === 'yllapito' && typeof exportInitPanel === 'function') exportInitPanel();
   });
 });

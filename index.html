@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
   <title>UWR Diary</title>
-  <link rel="stylesheet" href="styles.css?v=447">
+  <link rel="stylesheet" href="styles.css?v=448">
 </head>
 <body>
 
@@ -329,8 +329,8 @@
       </header>
       <nav class="nav-tabs">
         <button class="nav-tab active" data-admin-tab="aktiivisuus">Aktiivisuus</button>
+        <button class="nav-tab" data-admin-tab="hyvinvointi">Hyvinvointi</button>
         <button class="nav-tab" data-admin-tab="kayttajat">Käyttäjät</button>
-        <button class="nav-tab" data-admin-tab="csv">Data</button>
         <button class="nav-tab" data-admin-tab="yllapito">Ylläpito</button>
       </nav>
     </div>
@@ -364,6 +364,22 @@
         </div>
       </div>
 
+      <!-- Tab: Hyvinvointi (Feature A — valmentajan koonti) -->
+      <div id="admin-tab-hyvinvointi" class="tab-content hidden">
+        <div class="admin-section">
+          <div class="coachdigest-header">
+            <select id="coachdigest-team" class="admin-select"></select>
+            <button id="coachdigest-run-btn" class="btn-primary coachdigest-run-btn">↻ Päivitä</button>
+          </div>
+          <p id="coachdigest-intro" class="coachdigest-intro"></p>
+          <div id="coachdigest-meta" class="aicoach-meta"></div>
+          <div id="coachdigest-output">
+            <p class="aicoach-empty">Valitse joukkue ja paina Päivitä.</p>
+          </div>
+          <div id="coachdigest-players" class="coachdigest-players"></div>
+        </div>
+      </div>
+
       <!-- Tab: Käyttäjät -->
       <div id="admin-tab-kayttajat" class="tab-content hidden">
         <div class="admin-section">
@@ -373,10 +389,11 @@
         </div>
       </div>
 
-      <!-- Tab: Data -->
-      <div id="admin-tab-csv" class="tab-content hidden">
+      <!-- Tab: Ylläpito -->
+      <div id="admin-tab-yllapito" class="tab-content hidden">
+
         <div class="admin-section">
-          <h3 class="admin-section-title">Joukkueen data (CSV)</h3>
+          <h3 class="admin-section-title">📄 Joukkueen data (CSV)</h3>
           <div class="admin-csv-row">
             <select id="admin-csv-team-portal" class="admin-select">
               <option value="">Valitse joukkue…</option>
@@ -384,19 +401,13 @@
             </select>
             <button id="admin-csv-team-btn-portal" class="btn-primary admin-csv-btn">Lataa CSV</button>
           </div>
-        </div>
-        <div class="admin-section" style="margin-top:1rem;border-top:1px solid var(--border-light);padding-top:1rem;">
-          <h3 class="admin-section-title">Pelaajan CSV</h3>
+          <h3 class="admin-section-title" style="margin-top:1rem;">Pelaajan CSV</h3>
           <div id="admin-csv-player-list">
             <p style="font-size:0.85rem;color:var(--text-muted)">Valitse ensin joukkue.</p>
           </div>
         </div>
-      </div>
 
-      <!-- Tab: Ylläpito -->
-      <div id="admin-tab-yllapito" class="tab-content hidden">
-
-        <div class="admin-section">
+        <div class="admin-section" style="margin-top:1.5rem;border-top:1px solid var(--border-light);padding-top:1.5rem;">
           <h3 class="admin-section-title">🏟️ Joukkueet</h3>
           <div id="admin-teams-list"></div>
           <div class="admin-csv-row" style="margin-top:0.75rem">
@@ -1362,6 +1373,7 @@
             <li>Profiilissasi voit hallita mitä tietoja jaetaan joukkueelle: <strong>Jaa aktiviteetit</strong> ja <strong>Jaa kommentit</strong></li>
             <li>Jos <em>Jaa aktiviteetit</em> on pois päältä, treenisi eivät näy joukkueen syötteessä kenellekään</li>
             <li>Yksittäinen kommentti voidaan merkitä <strong>Yksityinen</strong>, jolloin se ei näy fiidissä vaikka kommenttien jakaminen olisi päällä</li>
+            <li><strong>Valmentajasi ja ylläpitäjä näkevät treenisi, fiiliksesi ja myös yksityiseksi merkityt kommenttisi</strong> — ne käytetään valmennuksen ja hyvinvoinnin tukena, eivät koskaan näy muille joukkuekavereille</li>
             <li>Profiilikuvasi ja nimimerkkisi näkyvät muille joukkueen jäsenille</li>
           </ul>
         </section>
@@ -1458,9 +1470,10 @@
   <script src="js/profile.js?v=72"></script>
   <script src="js/joukkue.js?v=16"></script>
   <script src="js/calendar.js?v=49"></script>
-  <script src="js/admin.js?v=67"></script>
+  <script src="js/admin.js?v=68"></script>
   <script src="js/export.js?v=2"></script>
   <script src="js/aicoach.js?v=20"></script>
+  <script src="js/coachdigest.js?v=1"></script>
   <script src="js/auth.js?v=25"></script>
   <script src="js/app.js?v=20"></script>
 
