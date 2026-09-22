@@ -2,11 +2,14 @@ name: Viikoittainen Hyvinvointi-koonti
 
 on:
   schedule:
-    # GitHub cron on UTC. Ma 18:00 Suomen aikaa = 16:00 UTC (talvi, UTC+2) tai
-    # 15:00 UTC (kesä, UTC+3). Molemmat ajetaan; skripti päästää läpi vain kun
-    # Suomen aika on 18 (DST-portti weekly-digest.mjs:ssä).
+    # GitHub cron on UTC ja voi viivästyä ruuhkassa tunteja. Kohde: ma 18:00
+    # Suomen aikaa = 15:00 UTC (kesä, UTC+3) tai 16:00 UTC (talvi, UTC+2).
+    # Skripti sallii ma klo 18+ tai koko tiistain; viikkolukko estää tuplat.
+    # Tiistai-aamun ajot ovat varmistus, jos maanantain ajot viivästyivät ohi.
     - cron: '0 15 * * 1'
     - cron: '0 16 * * 1'
+    - cron: '0 6 * * 2'
+    - cron: '0 7 * * 2'
   workflow_dispatch:
     inputs:
       force:

@@ -335,18 +335,30 @@ async function fetchEntries(db, uid) {
 }
 
 // ── Pääajo ────────────────────────────────────────────────────
-function isHelsinki18() {
-  const h = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Helsinki', hour: '2-digit', hourCycle: 'h23',
-  }).format(new Date());
-  return Number(h) === 18;
+// Suomen aika: viikonpäivä (1=ma…7=su) + tunti. Portti sallii ma klo ≥ 18,
+// jotta GitHubin ajastusviive (voi olla tunteja) ei estä lähetystä. Tuplat
+// estetään erikseen viikkokohtaisella lukolla (settings/digestState).
+function helsinkiNow() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Helsinki', weekday: 'short', hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const wdMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  const wd = wdMap[parts.find(p => p.type === 'weekday')?.value] || 0;
+  const hour = Number(parts.find(p => p.type === 'hour')?.value);
+  return { wd, hour };
 }
 
 async function main() {
   const force = process.env.FORCE_RUN === '1';
-  if (!force && !isHelsinki18()) {
-    console.log('Ei klo 18 Suomen aikaa — ohitetaan tämä ajo (DST-portti).');
-    return;
+  if (!force) {
+    // Kohde: ma klo 18. Sallitaan ma klo ≥ 18 TAI koko tiistai, jotta GitHubin
+    // ajastusviive (voi venyä tunteja, yli keskiyön) ei estä lähetystä.
+    // Viikkolukko (settings/digestState) estää tuplat.
+    const { wd, hour } = helsinkiNow();
+    if (!((wd === 1 && hour >= 18) || wd === 2)) {
+      console.log(`Ei ma klo 18+ eikä ti (nyt wd=${wd}, h=${hour}) — ohitetaan.`);
+      return;
+    }
   }
 
   const dryRun = process.env.DRY_RUN === '1';
@@ -361,6 +373,19 @@ async function main() {
 
   admin.initializeApp({ credential: admin.credential.cert(JSON.parse(saRaw)) });
   const db = admin.firestore();
+
+  // Tuplasuoja: yksi lähetys per ISO-viikko. Estää toisen cron-ajon (tai
+  // GitHubin viivästämän uusinta-ajon) lähettämästä samaa koontia toistamiseen.
+  const isTest = !!process.env.TEST_RECIPIENT;
+  const weekKey = calWeekKey(new Date());
+  const stateRef = db.collection('settings').doc('digestState');
+  if (!force && !isTest && !dryRun) {
+    const st = await stateRef.get();
+    if (st.exists && st.data()?.lastSentWeek?.[TEAM] === weekKey) {
+      console.log(`Viikon ${weekKey} koonti jo lähetetty — ohitetaan (tuplasuoja).`);
+      return;
+    }
+  }
 
   await loadWeekPlan(db);
   const users = await loadUsers(db);
@@ -406,6 +431,10 @@ async function main() {
     text: digestText,
     html,
   });
+
+  if (!isTest) {
+    await stateRef.set({ lastSentWeek: { [TEAM]: weekKey } }, { merge: true });
+  }
 
   console.log(`Lähetetty ${recipients.length} vastaanottajalle (viikko ${week}).`);
 }
