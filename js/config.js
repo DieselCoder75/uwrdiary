@@ -149,6 +149,17 @@ async function loadAppSettings() {
       if (data.voimaPlan && typeof data.voimaPlan === 'object') dynamicVoimaPlan = data.voimaPlan;
     }
     appSettingsLoaded = true;
+    // Tallenna kuluvan viikon tehoalue + voimaviikko splashia varten (esilataus).
+    try {
+      const monday = weeksAgoMonday(0);
+      const { week } = calIsoWeekData(monday);
+      localStorage.setItem('uppis_splash_wz', JSON.stringify({
+        week,
+        zone:  calPlannedZone(monday) || null,
+        voima: (typeof calVoimaType === 'function' ? calVoimaType(monday) : null) || null,
+      }));
+    } catch {}
+    if (typeof window.renderAuthWeekZone === 'function') window.renderAuthWeekZone();
   } catch (err) {
     console.warn('loadAppSettings:', err);
   }

@@ -33,30 +33,42 @@ function renderAuthGreeting() {
 }
 renderAuthGreeting();
 
-// ── Viikko + tehoalue splash-näytölle ────────────────────────
+// ── Viikko + tehoalue + voimaviikko splash-näytölle ──────────
 // Näytetään vain splashilla (auth-splash / auth-animating), ei login-lomakkeessa.
-// Käyttää WEEKLY_PLAN + calPlannedZone (calendar.js ladattu ennen auth.js:ää).
-(function renderAuthWeekZone() {
+// Tehoalue tulee dynamicWeekPlanista, jota ei ole vielä ladattu ensiruudulla →
+// luetaan viime session arvo localStoragesta (uppis_splash_wz). loadAppSettings
+// päivittää cachen ja kutsuu tämän uudelleen kun oikea suunnitelma on ladattu.
+function renderAuthWeekZone() {
   const wzel = document.getElementById('auth-week-zone');
   if (!wzel) return;
   try {
     const monday  = weeksAgoMonday(0);
     const { week } = calIsoWeekData(monday);
-    const zone    = calPlannedZone(monday);
-    if (!zone) { wzel.innerHTML = `<span class="auth-wz-week">Viikko ${week}</span>`; return; }
-    const zoneNums = parseZoneStr(zone);
-    const zoneNum  = zoneNums[zoneNums.length - 1] || 0;
-    const label     = zoneNum ? PERF_LABELS[zoneNum].split(' – ')[1] : zone;
-    const voima     = typeof calVoimaType === 'function' ? calVoimaType(monday) : null;
+    let zone  = calPlannedZone(monday);
+    let voima = typeof calVoimaType === 'function' ? calVoimaType(monday) : null;
+    // Splash-fallback: lue viime session tehoalue/voima jos live-dataa ei vielä ole
+    if (!zone || !voima) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('uppis_splash_wz') || 'null');
+        if (cached && cached.week === week) {
+          zone  = zone  || cached.zone;
+          voima = voima || cached.voima;
+        }
+      } catch {}
+    }
+    const zoneNum = zone ? (parseZoneStr(zone).slice(-1)[0] || 0) : 0;
+    const zoneLabel  = zone ? (zoneNum ? PERF_LABELS[zoneNum].split(' – ')[1] : zone) : null;
     const voimaLabel = voima ? `${voima}viikko` : null;
+    const lines =
+      (zoneLabel  ? `<span class="auth-wz-line">Tehoalue - ${escapeHtml(zoneLabel)}</span>` : '') +
+      (voimaLabel ? `<span class="auth-wz-line">Voimaharjoittelu - ${escapeHtml(voimaLabel)}</span>` : '');
     wzel.innerHTML =
       `<span class="auth-wz-week">Viikko ${week}</span>` +
-      `<div class="auth-wz-focus">` +
-        `<span class="auth-wz-line">Tehoalue - ${escapeHtml(label)}</span>` +
-        (voimaLabel ? `<span class="auth-wz-line">Voimaharjoittelu - ${escapeHtml(voimaLabel)}</span>` : '') +
-      `</div>`;
+      (lines ? `<div class="auth-wz-focus">${lines}</div>` : '');
   } catch(e) {}
-})();
+}
+renderAuthWeekZone();
+window.renderAuthWeekZone = renderAuthWeekZone;
 
 // ── Reload splash ─────────────────────────────────────────────
 // Jos käyttäjä on aiemmin kirjautunut, näytetään iso logo välittömästi
