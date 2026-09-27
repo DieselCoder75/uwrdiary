@@ -46,12 +46,15 @@ renderAuthGreeting();
     if (!zone) { wzel.innerHTML = `<span class="auth-wz-week">Viikko ${week}</span>`; return; }
     const zoneNums = parseZoneStr(zone);
     const zoneNum  = zoneNums[zoneNums.length - 1] || 0;
-    const color     = zoneNum ? PERF_COLORS[zoneNum - 1]      : 'var(--blue)';
-    const colorDark = zoneNum ? PERF_COLORS_DARK[zoneNum - 1] : 'var(--blue-mid)';
     const label     = zoneNum ? PERF_LABELS[zoneNum].split(' – ')[1] : zone;
+    const voima     = typeof calVoimaType === 'function' ? calVoimaType(monday) : null;
+    const voimaLabel = voima ? `${voima}viikko` : null;
     wzel.innerHTML =
       `<span class="auth-wz-week">Viikko ${week}</span>` +
-      `<span class="auth-wz-badge" style="background:${color}33;color:${colorDark};border-color:${color}66">${escapeHtml(zone)} – ${escapeHtml(label)}</span>`;
+      `<div class="auth-wz-focus">` +
+        `<span class="auth-wz-line">Tehoalue - ${escapeHtml(label)}</span>` +
+        (voimaLabel ? `<span class="auth-wz-line">Voimaharjoittelu - ${escapeHtml(voimaLabel)}</span>` : '') +
+      `</div>`;
   } catch(e) {}
 })();
 
